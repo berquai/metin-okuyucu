@@ -44,7 +44,7 @@ Bu yüzden:
 - Metin, cihazlar ve tarayıcılar arasında taşınmaz.
 - Tarayıcı verilerini temizlersen kayıtlı metin de silinir. Asıl metnini her zaman başka bir yerde sakla.
 
-İsteğe bağlı "Google (çevrimiçi)" sesi bu kuralın tek istisnasıdır: seçilirse metin Google sunucularına gider. Bu nedenle varsayılan olarak kapalıdır ve seçilmeden önce onay ister.
+Sayfa hiçbir dış adrese bağlanmaz; internet bağlantısı yalnızca sayfanın ilk açılışı için gerekir.
 
 ## Teknik notlar
 

@@ -241,7 +241,7 @@
           <label><input id="optLong" type="checkbox" checked> Uzun cümleleri işaretle</label>
           <label>Eşik <input id="longMax" type="number" min="10" max="200" step="1" value="40"> kelime</label>
         </div>
-        <p class="note" id="voiceNote">💡 En doğal Türkçe ses için bu dosyayı <b>Microsoft Edge</b> ile aç ve “Microsoft Emel / Ahmet Online (Natural) – Turkish” seslerinden birini seç. Bu sesler ücretsizdir ve kelime vurgusunu destekler. Google seçeneği resmî olmayan bir uç nokta kullanır ve metni Google’a gönderir. Yayımlanmamış metinler için önerilmez.</p>
+        <p class="note" id="voiceNote">💡 En doğal Türkçe ses için bu dosyayı <b>Microsoft Edge</b> ile aç ve “Microsoft Emel / Ahmet Online (Natural) – Turkish” seslerinden birini seç. Bu sesler ücretsizdir ve kelime vurgusunu destekler.</p>
       </div>
     </details>
 
@@ -720,7 +720,6 @@ function wordRangeAt(S, off) {
     engPlay(rest, s.handlers);
   }
   function voiceChoice() {
-    if (voiceSelect.value === 'google_online') return 'google';
     return voices.find(v => v.voiceURI === voiceSelect.value) || pickDefaultVoice();
   }
   function engSpeak(t, k) {
@@ -743,16 +742,6 @@ function wordRangeAt(S, off) {
     if (!out.trim()) { next(); return; }
     const choice = voiceChoice();
 
-    if (choice === 'google') {
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(out)}&tl=tr&client=tw-ob`;
-      const a = new Audio(url);
-      a.playbackRate = Number(settings.rate);
-      engine.audio = a;
-      a.onended = () => { if (engine.audio === a) engine.audio = null; next(); };
-      a.onerror = () => fail('Google sesi alınamadı (bağlantı ya da erişim sınırı). Bir sistem sesi seçmeyi dene.');
-      a.play().catch(() => fail('Google sesi çalınamadı. Bir sistem sesi seçmeyi dene.'));
-      return;
-    }
     if (!synth) { fail('Bu tarayıcı sesli okumayı desteklemiyor.'); return; }
 
     const u = new SpeechSynthesisUtterance(out);
@@ -775,7 +764,7 @@ function wordRangeAt(S, off) {
     synth.speak(u);
   }
 
-  const maxChunk = () => (voiceSelect.value === 'google_online' ? 160 : 200);
+  const maxChunk = () => 200;
   const isPlaying = () => (engine.playing && !engine.paused) || !!gapTimer;
   const isPaused = () => engine.paused || pausedGapNext >= 0;
   const isActive = () => isPlaying() || isPaused();
@@ -1099,11 +1088,6 @@ function wordRangeAt(S, off) {
       o.textContent = `${v.name} — ${v.lang}${v.default ? ' (varsayılan)' : ''}`;
       voiceSelect.appendChild(o);
     });
-    const g = document.createElement('option');
-    g.value = 'google_online';
-    g.textContent = '🌐 Google (çevrimiçi · resmî değil · metin Google’a gider)';
-    voiceSelect.appendChild(g);
-    // Google yalnızca kullanıcı bilerek seçtiyse seçili kalır; hiçbir zaman kendiliğinden seçilmez.
     if (prev && prev !== '__none' && [...voiceSelect.options].some(o => o.value === prev)) voiceSelect.value = prev;
     else { const d = sorted[0]; voiceSelect.value = d ? d.voiceURI : '__none'; }
     lastVoiceValue = voiceSelect.value;
@@ -1295,13 +1279,7 @@ function wordRangeAt(S, off) {
     el.addEventListener('change', () => { if (el !== dictText) el.blur(); });
   });
 
-  voiceSelect.addEventListener('change', async () => {
-    if (voiceSelect.value === 'google_online' && lastVoiceValue !== 'google_online') {
-      voiceSelect.value = lastVoiceValue;
-      const ok = await askConfirm('Google çevrimiçi sesi resmî olmayan bir uç nokta kullanır ve okunan metin cümle cümle Google sunucularına gönderilir. Kelime vurgusu ve perde ayarı bu seste çalışmaz. Yayımlanmamış metinler için önerilmez.\n\nYine de seçilsin mi?', 'Google’ı seç');
-      if (!ok) return;
-      voiceSelect.value = 'google_online';
-    }
+  voiceSelect.addEventListener('change', () => {
     lastVoiceValue = voiceSelect.value;
     settings.voice = voiceSelect.value;
     saveSettings();
