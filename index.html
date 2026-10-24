@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Berkay Çelik">
+<meta name="description" content="Uzun akademik metinleri cümle cümle sesli okuyan, tarayıcıda çalışan okuma ve redaksiyon aracı.">
 <title>Metin Okuyucu</title>
 <style>
   :root {
@@ -12,105 +14,124 @@
     --primary-bg:#345477; --primary-border:#557ba5; --accent:#8ab4f8;
     --underline:#60a5fa; --sent-bg:rgba(96,165,250,.10);
     --word-bg:#f59e0b; --word-text:#111827; --mark-bg:rgba(250,204,21,.22); --long:#f87171;
-    --font:Arial, Helvetica, sans-serif; --size:18px; --lh:1.65;
+    --font:Arial, Helvetica, sans-serif; --size:18px; --lh:1.65; --weight:400;
+    --ls:0em; --ws:0em; --measure:100%; --align:left;
+    --ui:1;   /* arayüz ölçeği: ekrana sığdırmak için betik tarafından ayarlanır */
   }
   * { box-sizing:border-box; }
   html, body { height:100%; margin:0; overflow:hidden; background:var(--bg); }
-  body { color:var(--text); font-family:var(--font); font-size:16px; line-height:1.5; }
+  body { color:var(--text); font-family:system-ui, "Segoe UI", Arial, sans-serif; font-size:calc(16px * var(--ui)); line-height:1.5; }
   [hidden] { display:none !important; }
   .wrap {
-    max-width:1050px; height:100%; margin:0 auto; padding-block:12px;
-    padding-left:max(20px, env(safe-area-inset-left, 0px));
-    padding-right:max(20px, env(safe-area-inset-right, 0px));
-    display:flex; flex-direction:column; gap:8px; overflow:hidden;
+    max-width:1100px; height:100%; margin:0 auto; padding-block:calc(12px * var(--ui));
+    padding-left:max(calc(20px * var(--ui)), env(safe-area-inset-left, 0px));
+    padding-right:max(calc(20px * var(--ui)), env(safe-area-inset-right, 0px));
+    display:flex; flex-direction:column; gap:calc(8px * var(--ui)); overflow:hidden;
   }
   .ic { display:inline-block; }
   .ic + .lbl, .lbl + .ic { margin-left:5px; }
-  /* Sayfa içi onay penceresi (yayın ortamında confirm() çalışmaz) */
-  .modal {
-    position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
-    padding:16px; background:rgba(0,0,0,.55);
-  }
-  .modal-box {
-    width:100%; max-width:460px; background:var(--panel); color:var(--text);
-    border:1px solid var(--line); border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:14px;
-  }
-  .modal-box p { margin:0; line-height:1.55; white-space:pre-line; }
-  .modal-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
 
-  /* ---- Yalnızca simge (yazısız düğmeler) ---- */
-  body.icons-only .controls .lbl { display:none; }
-  body.icons-only .controls button { min-width:46px; font-size:18px; padding:6px 10px; }
+  /* ---------- Üst bölüm ---------- */
+  header { display:flex; align-items:center; justify-content:space-between; gap:8px 12px; flex:0 0 auto; flex-wrap:wrap; }
+  header .actions { display:flex; gap:calc(6px * var(--ui)); flex-wrap:wrap; }
+  header .actions button { min-height:calc(36px * var(--ui)); padding:calc(5px * var(--ui)) calc(10px * var(--ui)); font-size:calc(14px * var(--ui)); }
+  .title { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 12px; min-width:0; }
+  h1 { font-size:calc(20px * var(--ui)); font-weight:650; margin:0; letter-spacing:.01em; }
+  .byline { font-size:calc(13px * var(--ui)); color:var(--muted); }
 
-  /* ---- Mobil düzen (Görünüm panelinden seçilir) ---- */
-  body.mobile-layout .wrap { padding-block:8px; gap:6px;
-    padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
-  body.mobile-layout header { order:0; }
-  body.mobile-layout h1 { font-size:17px; }
-  body.mobile-layout .byline { font-size:12px; }
-  body.mobile-layout header .actions button { min-height:36px; padding:4px 9px; font-size:13px; }
-  body.mobile-layout .current { order:1; max-height:76px; padding:8px 12px; }
-  body.mobile-layout .editor, body.mobile-layout .reader-view { order:2; padding:12px; }
-  body.mobile-layout .stats { order:3; font-size:12px; }
-  body.mobile-layout .panels { order:4; gap:6px; }
-  body.mobile-layout details.panel { flex-basis:120px; }
-  body.mobile-layout details.panel > summary { padding:6px 10px; font-size:13px; }
-  body.mobile-layout .panel-body { max-height:40vh; max-height:40dvh; }
-  body.mobile-layout .status { order:5; font-size:11px; }
-  body.mobile-layout .toolbar.controls { order:6; flex-direction:column; align-items:stretch; padding:8px; gap:6px; }
-  body.mobile-layout .controls .group { flex-wrap:nowrap; gap:6px; }
-  body.mobile-layout .controls .group.play { order:2; }
-  body.mobile-layout .controls .group.tools { order:1; }
-  body.mobile-layout .controls button { flex:1 1 0; min-width:0; min-height:46px; padding:4px 6px; font-size:13px; white-space:nowrap; }
-  body.mobile-layout:not(.icons-only) .controls .group { flex-wrap:wrap; }
-  body.mobile-layout:not(.icons-only) .controls button { flex:1 1 auto; }
-  body.mobile-layout.icons-only .controls button { font-size:20px; }
-  body.mobile-layout .controls #toggleBtn { flex-grow:1.6; }
-  header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex:0 0 auto; }
-  header .actions { display:flex; gap:8px; }
-  h1 { font-size:20px; font-weight:600; margin:0; }
   .toolbar {
-    flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:8px;
-    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px;
+    flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:calc(8px * var(--ui));
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:calc(10px * var(--ui));
   }
   button, select, input, textarea { font:inherit; }
   button, select {
     color:var(--text); background:var(--btn-bg); border:1px solid var(--btn-border);
-    border-radius:8px; padding:7px 11px; min-height:38px; font-size:14px;
+    border-radius:8px; padding:calc(7px * var(--ui)) calc(11px * var(--ui));
+    min-height:calc(38px * var(--ui)); font-size:calc(14px * var(--ui));
   }
-  button { cursor:pointer; }
+  button { cursor:pointer; transition:background-color .12s ease, transform .08s ease; }
   button:hover { background:var(--btn-hover); }
+  button:active { transform:translateY(1px); }
   button.primary { background:var(--primary-bg); border-color:var(--primary-border); }
   button.on { outline:2px solid var(--accent); outline-offset:-2px; }
+  button.flash { outline:2px solid var(--accent); outline-offset:-2px; }
   button:focus-visible, select:focus-visible, textarea:focus-visible,
   input:focus-visible, summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  label { color:var(--muted); font-size:13px; display:inline-flex; align-items:center; gap:8px; }
-  select { max-width:340px; }
-  input[type=range] { width:110px; accent-color:var(--accent); }
+  label { color:var(--muted); font-size:calc(13px * var(--ui)); display:inline-flex; align-items:center; gap:8px; }
+  select { max-width:100%; }
+  input[type=range] { width:calc(120px * var(--ui)); accent-color:var(--accent); }
   input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; margin:0; }
   input[type=number] {
     width:66px; color:var(--text); background:var(--btn-bg);
     border:1px solid var(--btn-border); border-radius:6px; padding:4px 6px;
   }
   input[type=color] {
-    width:38px; height:34px; padding:2px; border:1px solid var(--btn-border);
+    width:40px; height:34px; padding:2px; border:1px solid var(--btn-border);
     border-radius:7px; background:var(--btn-bg); cursor:pointer;
   }
+
+  /* ---------- Okuma düğmeleri ---------- */
+  .toolbar.controls { justify-content:space-between; gap:calc(8px * var(--ui)) calc(16px * var(--ui)); }
+  .group { display:flex; flex-wrap:wrap; align-items:center; gap:calc(8px * var(--ui)); }
+  /* En sık kullanılan düğme: Oku / Duraklat */
+  .controls #toggleBtn {
+    min-width:calc(132px * var(--ui)); min-height:calc(46px * var(--ui));
+    font-size:calc(17px * var(--ui)); font-weight:600; padding-inline:calc(18px * var(--ui));
+  }
+  .controls #toggleBtn .ic { font-size:1.15em; }
+
+  /* Yalnızca simge: düğmeler büyür, Oku/Duraklat daha da büyür */
+  body.icons-only .controls .lbl { display:none; }
+  body.icons-only .controls button {
+    min-width:calc(56px * var(--ui)); min-height:calc(50px * var(--ui));
+    font-size:calc(23px * var(--ui)); padding:calc(4px * var(--ui)) calc(12px * var(--ui)); line-height:1;
+  }
+  body.icons-only .controls #toggleBtn {
+    min-width:calc(96px * var(--ui)); min-height:calc(58px * var(--ui)); font-size:calc(30px * var(--ui));
+  }
+  body.icons-only .controls #toggleBtn .ic { font-size:1em; }
+
+  /* ---------- Mobil düzen (Görünüm panelinden seçilir) ---------- */
+  body.mobile-layout header { order:0; }
+  body.mobile-layout .current { order:1; }
+  body.mobile-layout .editor, body.mobile-layout .reader-view { order:2; }
+  body.mobile-layout .stats { order:3; }
+  body.mobile-layout .panels { order:4; }
+  body.mobile-layout .status { order:5; }
+  body.mobile-layout .toolbar.controls { order:6; flex-direction:column; align-items:stretch; gap:6px; }
+  body.mobile-layout .controls .group { flex-wrap:nowrap; gap:6px; }
+  body.mobile-layout .controls .group.play { order:2; }
+  body.mobile-layout .controls .group.tools { order:1; }
+  body.mobile-layout .controls button { flex:1 1 0; min-width:0; white-space:nowrap; }
+  body.mobile-layout:not(.icons-only) .controls .group { flex-wrap:wrap; }
+  body.mobile-layout:not(.icons-only) .controls button { flex:1 1 auto; }
+  body.mobile-layout .controls #toggleBtn { flex-grow:2; }
+
+  /* ---------- Geçerli cümle kutusu ---------- */
   .current {
-    flex:0 0 auto; max-height:110px; overflow:auto; background:var(--panel);
-    border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+    flex:0 0 auto; max-height:calc(120px * var(--ui)); overflow:auto; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:calc(8px * var(--ui)) calc(14px * var(--ui));
   }
   .current-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px; }
-  .current-label { color:var(--muted); font-size:12px; }
-  .current-head button { min-height:30px; padding:3px 10px; font-size:13px; }
-  #currentSentence { line-height:var(--lh); }
+  .current-label { color:var(--muted); font-size:calc(12px * var(--ui)); }
+  #copySentenceBtn {
+    min-height:calc(40px * var(--ui)); min-width:calc(118px * var(--ui));
+    padding:calc(6px * var(--ui)) calc(16px * var(--ui)); font-size:calc(15px * var(--ui)); font-weight:600;
+  }
+  #currentSentence { line-height:1.55; font-size:calc(15px * var(--ui)); }
+
+  /* ---------- Metin alanları ---------- */
   .editor, .reader-view {
     flex:1 1 0; min-height:0; width:100%; overflow-y:auto; overscroll-behavior:contain;
     color:var(--text); background:var(--bg); border:1px solid var(--line); border-radius:12px;
-    padding:18px; font-family:var(--font); font-size:var(--size); line-height:var(--lh);
+    padding-block:18px; padding-inline:max(18px, calc((100% - var(--measure)) / 2));
+    font-family:var(--font); font-size:var(--size); line-height:var(--lh); font-weight:var(--weight);
+    letter-spacing:var(--ls); word-spacing:var(--ws); text-align:var(--align); hyphens:manual;
     white-space:pre-wrap; overflow-wrap:break-word;
   }
+  body.justify .editor, body.justify .reader-view { hyphens:auto; }
   .editor { resize:none; display:block; }
+  .editor::placeholder { color:var(--muted); opacity:.8; }
   .reader-view { display:none; cursor:default; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
   body.reading-mode #editor { display:none; }
   body.reading-mode #readerView { display:block; }
@@ -126,62 +147,151 @@
   .sentence.active.marked { background-color:var(--mark-bg); }
   .word-active {
     background-color:var(--word-bg); color:var(--word-text); border-radius:4px;
-    padding:1px 3px; margin:-1px -3px; font-weight:600; box-shadow:0 0 0 1px var(--word-bg);
+    padding:1px 3px; margin:-1px -3px; box-shadow:0 0 0 1px var(--word-bg);
   }
   .stats {
-    flex:0 0 auto; color:var(--muted); font-size:13px; padding:0 4px; margin-top:-2px;
-    font-variant-numeric:tabular-nums;
+    flex:0 0 auto; color:var(--muted); font-size:calc(13px * var(--ui)); padding:0 4px; margin-top:-2px;
+    font-variant-numeric:tabular-nums; display:flex; flex-wrap:wrap; gap:2px 14px;
   }
-  .status { flex:0 0 auto; color:var(--muted); font-size:12px; padding:0 4px; opacity:.9; }
-  .toolbar.controls { justify-content:space-between; gap:8px 16px; }
-  .group { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-  .title { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; min-width:0; }
-  .byline { font-size:14px; color:var(--muted); }
-  .byline a { color:var(--accent); text-decoration:none; }
-  .byline a:hover { text-decoration:underline; }
-  .panels { flex:0 0 auto; display:flex; flex-wrap:wrap; gap:8px; }
+  .stats .doc { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .status {
+    flex:0 0 auto; color:var(--muted); font-size:calc(12px * var(--ui)); padding:0 4px; opacity:.95;
+    display:flex; align-items:center; gap:10px; min-height:calc(18px * var(--ui));
+  }
+  .status button { min-height:26px; padding:2px 10px; font-size:12px; }
+
+  /* ---------- Paneller ---------- */
+  .panels { flex:0 0 auto; display:flex; flex-wrap:wrap; gap:calc(8px * var(--ui)); }
   details.panel {
-    flex:1 1 180px; background:var(--panel); border:1px solid var(--line); border-radius:12px; min-width:0;
+    flex:1 1 170px; background:var(--panel); border:1px solid var(--line); border-radius:12px; min-width:0;
   }
   details.panel[open] { flex-basis:100%; }
-  details.panel > summary { cursor:pointer; padding:8px 14px; color:var(--muted); font-size:14px; user-select:none; }
+  details.panel > summary {
+    cursor:pointer; padding:calc(7px * var(--ui)) calc(14px * var(--ui)); color:var(--muted);
+    font-size:calc(14px * var(--ui)); user-select:none;
+  }
   details.panel[open] > summary { border-bottom:1px solid var(--line); }
   .panel-body {
     max-height:34vh; max-height:34dvh; overflow:auto; padding:12px 14px;
     display:flex; flex-direction:column; gap:12px;
   }
   .row { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; }
+  .sub { color:var(--text); font-size:13px; font-weight:600; margin:2px 0 -4px; opacity:.85; }
   .note { color:var(--muted); font-size:12px; margin:0; line-height:1.5; }
+  .badge { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .badge.cloud { border-color:var(--accent); color:var(--accent); }
   #dictText {
     width:100%; min-height:200px; resize:vertical; color:var(--text); background:var(--bg);
     border:1px solid var(--line); border-radius:8px; padding:10px;
-    font-family:'Courier New', monospace; font-size:14px; line-height:1.5; white-space:pre;
+    font-family:Consolas, 'Courier New', monospace; font-size:14px; line-height:1.5; white-space:pre;
   }
   .marks-list { margin:0; padding-left:24px; }
   .marks-list li { margin:5px 0; cursor:pointer; font-size:14px; line-height:1.5; }
   .marks-list li:hover { color:var(--accent); }
   .marks-list li.missing { opacity:.55; cursor:default; text-decoration:line-through; }
-  @media (max-width:650px) {
-    .wrap { padding-block:8px; gap:6px;
-      padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
-    h1 { font-size:17px; }
-    .toolbar { gap:6px; padding:8px; }
-    button, select { padding:5px 8px; min-height:34px; font-size:13px; }
-    .editor, .reader-view { padding:12px; }
-    .current { max-height:80px; }
+  .swatches { display:flex; flex-wrap:wrap; gap:8px; }
+  .swatch {
+    display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-height:0; width:118px;
+    padding:8px 10px; border-radius:10px; font-size:12px; text-align:left; line-height:1.3;
+  }
+  .swatch .dots { display:flex; gap:4px; margin-top:3px; }
+  .swatch .dots i { width:12px; height:12px; border-radius:50%; display:inline-block; border:1px solid rgba(127,127,127,.4); }
+  .swatch.sel { outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* ---------- Dosya sürükle-bırak ---------- */
+  .drop-zone {
+    position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.45); padding:24px; pointer-events:none;
+  }
+  .drop-card {
+    border:3px dashed var(--accent); border-radius:18px; background:var(--panel); color:var(--text);
+    padding:34px 40px; text-align:center; max-width:560px; box-shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  .drop-card .big { font-size:42px; line-height:1; }
+  .drop-card h2 { margin:12px 0 6px; font-size:22px; }
+  .drop-card p { margin:0; color:var(--muted); font-size:14px; }
+
+  /* ---------- Pencereler (onay, yardım, hakkında) ---------- */
+  .modal {
+    position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+    padding:16px; background:rgba(0,0,0,.55);
+  }
+  .modal-box {
+    width:100%; max-width:460px; max-height:calc(100dvh - 32px); background:var(--panel); color:var(--text);
+    border:1px solid var(--line); border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:14px;
+    box-shadow:0 24px 70px rgba(0,0,0,.4);
+  }
+  .modal-box p { margin:0; line-height:1.55; white-space:pre-line; }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+  .modal-box.wide { max-width:920px; height:min(680px, calc(100dvh - 32px)); padding:0; gap:0; overflow:hidden; }
+  .dlg-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); }
+  .dlg-head h2 { margin:0; font-size:18px; font-weight:650; }
+  .dlg-head button { min-height:34px; padding:4px 12px; }
+  .help-body { display:flex; flex:1 1 auto; min-height:0; }
+  .help-nav { flex:0 0 220px; border-right:1px solid var(--line); overflow:auto; padding:10px 8px; display:flex; flex-direction:column; gap:2px; }
+  .help-nav button {
+    text-align:left; background:transparent; border:1px solid transparent; min-height:34px; padding:6px 10px; font-size:14px; color:var(--muted);
+  }
+  .help-nav button:hover { background:var(--btn-hover); color:var(--text); }
+  .help-nav button.sel { background:var(--btn-bg); border-color:var(--btn-border); color:var(--text); font-weight:600; }
+  .help-content { flex:1 1 auto; overflow:auto; padding:18px 24px 26px; line-height:1.6; font-size:15px; }
+  .help-content section { display:none; }
+  .help-content section.sel { display:block; }
+  .help-content h3 { margin:0 0 10px; font-size:19px; }
+  .help-content h4 { margin:18px 0 6px; font-size:15px; color:var(--accent); }
+  .help-content p { margin:0 0 10px; }
+  .help-content ul, .help-content ol { margin:0 0 10px; padding-left:22px; }
+  .help-content li { margin:3px 0; }
+  .help-content table { border-collapse:collapse; width:100%; margin:6px 0 12px; font-size:14px; }
+  .help-content th, .help-content td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  .help-content th { background:var(--btn-bg); font-weight:600; }
+  .tip { border-left:3px solid var(--accent); background:var(--sent-bg); padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0 12px; }
+  kbd {
+    display:inline-block; min-width:1.6em; text-align:center; font-family:Consolas, monospace; font-size:.86em;
+    padding:1px 6px; border:1px solid var(--btn-border); border-bottom-width:2px; border-radius:5px; background:var(--btn-bg); color:var(--text);
+  }
+  code { font-family:Consolas, monospace; font-size:.92em; background:var(--btn-bg); padding:0 4px; border-radius:4px; }
+  .help-content a, .about a { color:var(--accent); }
+
+  .about { overflow:auto; padding:22px 26px 20px; display:flex; flex-direction:column; gap:16px; }
+  .about-top { display:flex; gap:18px; align-items:center; }
+  .about-logo { flex:0 0 auto; width:78px; height:78px; }
+  .about-name { font-size:24px; font-weight:700; margin:0; }
+  .about-ver { color:var(--muted); font-size:14px; margin-top:2px; }
+  .about-lead { font-size:15px; line-height:1.6; margin:0; }
+  .about-grid { display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; font-size:14px; margin:0; }
+  .about-grid dt { color:var(--muted); }
+  .about-grid dd { margin:0; }
+  .license-text {
+    font-family:Consolas, monospace; font-size:12px; line-height:1.5; white-space:pre-wrap; background:var(--bg);
+    border:1px solid var(--line); border-radius:8px; padding:12px; max-height:230px; overflow:auto; margin:0;
+  }
+  .about-foot { color:var(--muted); font-size:12px; border-top:1px solid var(--line); padding-top:12px; }
+
+  @media (max-width:760px) {
+    header .actions .lbl { display:none; }
+    .help-body { flex-direction:column; }
+    .help-nav { flex:0 0 auto; flex-direction:row; flex-wrap:wrap; border-right:0; border-bottom:1px solid var(--line); max-height:120px; }
+    .help-nav button { font-size:13px; min-height:30px; padding:3px 8px; }
+    .help-content { padding:14px 16px 20px; }
+    .about-grid { grid-template-columns:1fr; gap:2px; }
+    .about-grid dd { margin-bottom:6px; }
   }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap" id="wrap">
   <header>
     <div class="title">
       <h1>Metin Okuyucu</h1>
-      <span class="byline">v3 · Berkay Çelik tarafından geliştirilmiştir · <a href="mailto:berkcel@gmail.com">berkcel@gmail.com</a></span>
+      <span class="byline">v4 · Berkay Çelik</span>
     </div>
     <div class="actions">
-      <button id="viewBtn" type="button" title="Okuma görünümü ile düzenleme arasında geç">👁 Okuma görünümü</button>
-      <button id="clearBtn" type="button" title="Editördeki metni temizle">Metni temizle</button>
+      <button id="openBtn" type="button" title="Dosya aç (Ctrl+O). Dosyayı sayfaya sürükleyip bırakabilirsin."><span class="ic">📂</span><span class="lbl">Dosya aç</span></button>
+      <button id="viewBtn" type="button" title="Okuma görünümü ile düzenleme arasında geç (Esc)"><span class="ic">👁</span><span class="lbl">Okuma görünümü</span></button>
+      <button id="clearBtn" type="button" title="Metni temizle (E). Geri alınabilir."><span class="ic">🗑</span><span class="lbl">Temizle</span></button>
+      <button id="helpBtn" type="button" title="Yardım (F1)"><span class="ic">?</span><span class="lbl">Yardım</span></button>
+      <button id="aboutBtn" type="button" title="Hakkında"><span class="ic">ⓘ</span><span class="lbl">Hakkında</span></button>
     </div>
   </header>
 
@@ -189,30 +299,30 @@
     <div class="group tools" aria-label="Okuma araçları">
       <button id="readFromCaretBtn" type="button" aria-label="İmleçten oku" title="İmleçten oku: düzenleyicide imlecin bulunduğu cümleden başlar"><span class="ic">⌖</span><span class="lbl">İmleçten oku</span></button>
       <button id="readSelectionBtn" type="button" aria-label="Seçili metni oku" title="Seçili metni oku"><span class="ic">▣</span><span class="lbl">Seçili metni oku</span></button>
-      <button id="markBtn" type="button" aria-label="İşaretle" title="İşaretle: cümleyi gözden geçirmek üzere işaretler (Kısayol: M)"><span class="ic">★</span><span class="lbl">İşaretle</span></button>
-      <button id="stopBtn" type="button" aria-label="Durdur" title="Durdur ve düzenleme moduna dön (Kısayol: Esc)"><span class="ic">■</span><span class="lbl">Durdur</span></button>
+      <button id="markBtn" type="button" aria-label="İşaretle" title="İşaretle: cümleyi gözden geçirmek üzere işaretler (M)"><span class="ic">★</span><span class="lbl">İşaretle</span></button>
+      <button id="stopBtn" type="button" aria-label="Durdur" title="Durdur ve düzenleme moduna dön (Esc)"><span class="ic">■</span><span class="lbl">Durdur</span></button>
     </div>
     <div class="group play" aria-label="Oynatma">
-      <button id="readFromStartBtn" type="button" aria-label="Baştan oku" title="Baştan: metnin ilk cümlesinden başlatır"><span class="ic">⏮&#xFE0E;</span><span class="lbl">Baştan</span></button>
-      <button id="prevBtn" type="button" aria-label="Önceki cümle" title="Önceki cümle (Kısayol: Sol ok)"><span class="ic">◁</span><span class="lbl">Önceki</span></button>
-      <button id="toggleBtn" class="primary" type="button" aria-label="Oku" title="Oku / Duraklat: geçerli cümleden sona kadar okur (Kısayol: Boşluk)"><span class="ic">▶&#xFE0E;</span><span class="lbl">Oku</span></button>
-      <button id="nextBtn" type="button" aria-label="Sonraki cümle" title="Sonraki cümle (Kısayol: Sağ ok)"><span class="lbl">Sonraki</span><span class="ic">▷</span></button>
-      <button id="restartSentenceBtn" type="button" aria-label="Cümleyi baştan oku" title="Cümleyi baştan oku (Kısayol: R)"><span class="ic">↻</span><span class="lbl">Cümleyi baştan oku</span></button>
+      <button id="readFromStartBtn" type="button" aria-label="Baştan oku" title="Tümünü en baştan oku (A)"><span class="ic">⏮&#xFE0E;</span><span class="lbl">Baştan</span></button>
+      <button id="prevBtn" type="button" aria-label="Önceki cümle" title="Önceki cümle (Sol ok)"><span class="ic">◁</span><span class="lbl">Önceki</span></button>
+      <button id="toggleBtn" class="primary" type="button" aria-label="Oku" title="Oku / Duraklat / Devam et (Boşluk)"><span class="ic">▶&#xFE0E;</span><span class="lbl">Oku</span></button>
+      <button id="nextBtn" type="button" aria-label="Sonraki cümle" title="Sonraki cümle (Sağ ok)"><span class="lbl">Sonraki</span><span class="ic">▷</span></button>
+      <button id="restartSentenceBtn" type="button" aria-label="Cümleyi baştan oku" title="Cümleyi baştan oku (R)"><span class="ic">↻</span><span class="lbl">Cümleyi baştan oku</span></button>
     </div>
   </div>
 
   <div class="current">
     <div class="current-head">
       <div class="current-label">Okunacak / okunan cümle</div>
-      <button id="copySentenceBtn" type="button" title="Bu cümleyi kopyala">Kopyala</button>
+      <button id="copySentenceBtn" type="button" title="Bu cümleyi kopyala (C)">⧉ Kopyala</button>
     </div>
     <div id="currentSentence">Metin eklediğinde cümle burada görünür.</div>
   </div>
 
-  <textarea id="editor" class="editor" spellcheck="false" aria-label="Yazılabilir metin alanı" placeholder="Metnini buraya yaz veya yapıştır…"></textarea>
+  <textarea id="editor" class="editor" spellcheck="false" aria-label="Yazılabilir metin alanı" placeholder="Metnini buraya yaz ya da yapıştır… Dosyayı da bu alana sürükleyip bırakabilirsin (PDF, Word, EPUB, ODT, RTF, TXT, HTML, Markdown)."></textarea>
   <div id="readerView" class="reader-view" aria-label="Okuma görünümü"></div>
 
-  <div class="stats" id="position">Cümle: 0 / 0</div>
+  <div class="stats"><span id="position">Cümle: 0 / 0</span><span id="docName" class="doc"></span></div>
 
   <div class="panels">
     <details class="panel" id="settingsPanel">
@@ -220,12 +330,14 @@
       <div class="panel-body">
         <div class="row">
           <label>Ses <select id="voiceSelect" aria-label="Ses seçimi"><option>Sesler yükleniyor…</option></select></label>
+          <span id="voiceBadge" class="badge"></span>
         </div>
+        <p class="note" id="voiceNote"></p>
         <div class="row">
           <label>Hız <span id="rateValue">1,0×</span>
-            <input id="rate" type="range" min="0.6" max="1.8" step="0.1" value="1"></label>
+            <input id="rate" type="range" min="0.5" max="2" step="0.05" value="1"></label>
           <label>Perde <span id="pitchValue">1,0</span>
-            <input id="pitch" type="range" min="0.7" max="1.3" step="0.1" value="1"></label>
+            <input id="pitch" type="range" min="0.7" max="1.3" step="0.05" value="1"></label>
         </div>
         <div class="row">
           <label>Cümle arası <span id="sentPauseValue">150 ms</span>
@@ -241,61 +353,81 @@
           <label><input id="optLong" type="checkbox" checked> Uzun cümleleri işaretle</label>
           <label>Eşik <input id="longMax" type="number" min="10" max="200" step="1" value="40"> kelime</label>
         </div>
-        <p class="note" id="voiceNote">💡 En doğal Türkçe ses için bu dosyayı <b>Microsoft Edge</b> ile aç ve “Microsoft Emel / Ahmet Online (Natural) – Turkish” seslerinden birini seç. Bu sesler ücretsizdir ve kelime vurgusunu destekler.</p>
+        <div class="row">
+          <label><input id="optFootnotes" type="checkbox"> Word ve ODT dosyalarında dipnotları metnin sonuna ekle</label>
+        </div>
       </div>
     </details>
 
     <details class="panel" id="appearancePanel">
       <summary>🎨 Görünüm</summary>
       <div class="panel-body">
+        <div class="sub">Tema</div>
+        <div class="swatches" id="themeSwatches"></div>
+        <div class="row">
+          <label>Özel renkler:</label>
+          <label>Arka plan <input id="bgColor" type="color" aria-label="Arka plan rengi"></label>
+          <label>Yazı <input id="textColor" type="color" aria-label="Yazı rengi"></label>
+          <label>Vurgu <input id="accentColor" type="color" aria-label="Vurgu rengi"></label>
+          <label>Okunan kelime <input id="wordColor" type="color" aria-label="Okunan kelime rengi"></label>
+        </div>
+        <p class="note">Bir rengi değiştirdiğinde seçili tema “Özel” temaya dönüşür; diğer tonlar (panel, çizgi, düğme) seçtiğin renklerden otomatik türetilir.</p>
+
+        <div class="sub">Yazı</div>
+        <div class="row">
+          <label>Yazı tipi <select id="fontFamily" aria-label="Yazı tipi"></select></label>
+          <label>Kalınlık
+            <select id="fontWeight" aria-label="Yazı kalınlığı">
+              <option value="300">İnce</option><option value="400">Normal</option>
+              <option value="500">Orta</option><option value="600">Yarı kalın</option><option value="700">Kalın</option>
+            </select>
+          </label>
+          <label>Hizalama
+            <select id="textAlign" aria-label="Hizalama">
+              <option value="left">Sola yaslı</option><option value="justify">İki yana yaslı</option>
+            </select>
+          </label>
+        </div>
+        <p class="note" id="fontNote"></p>
+        <div class="row">
+          <label>Boyut <span id="fontSizeValue">18 px</span>
+            <input id="fontSize" type="range" min="12" max="40" step="1" value="18"></label>
+          <label>Satır aralığı <span id="lineHeightValue">1,65</span>
+            <input id="lineHeight" type="range" min="1.1" max="2.6" step="0.05" value="1.65"></label>
+        </div>
+        <div class="row">
+          <label>Harf aralığı <span id="letterSpacingValue">0</span>
+            <input id="letterSpacing" type="range" min="-0.02" max="0.15" step="0.01" value="0"></label>
+          <label>Kelime aralığı <span id="wordSpacingValue">0</span>
+            <input id="wordSpacing" type="range" min="0" max="0.6" step="0.05" value="0"></label>
+          <label>Satır genişliği
+            <select id="measure" aria-label="Satır genişliği">
+              <option value="100%">Tam genişlik</option><option value="55ch">Dar (55 karakter)</option>
+              <option value="70ch">Kitap (70 karakter)</option><option value="85ch">Orta (85 karakter)</option>
+              <option value="100ch">Geniş (100 karakter)</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="sub">Düzen</div>
         <div class="row">
           <label>Düzen
             <select id="layoutSelect" aria-label="Düzen">
               <option value="desktop">Masaüstü</option>
-              <option value="mobile">Mobil (düğmeler altta, dokunmaya uygun)</option>
+              <option value="mobile">Mobil (düğmeler altta)</option>
             </select>
           </label>
-          <label><input id="optIcons" type="checkbox"> Okuma düğmelerinde yalnızca simge göster</label>
-        </div>
-        <p class="note">İkisini de bilgisayarda deneyip görebilirsin; seçimin bu cihazda hatırlanır. Simge modunda bir düğmenin ne yaptığını görmek için fareyle üzerine gel.</p>
-        <div class="row">
-          <label>Hazır tema
-            <select id="themeSelect" aria-label="Hazır tema seçimi">
-              <option value="dark">Koyu lacivert</option>
-              <option value="charcoal">Antrasit</option>
-              <option value="sepia">Sepya</option>
-              <option value="light">Açık krem</option>
-              <option value="sage">Yumuşak yeşil</option>
-              <option value="custom">Özel</option>
-            </select>
-          </label>
-          <label>Arka plan <input id="bgColor" type="color" value="#1b232e" aria-label="Arka plan rengi"></label>
-          <label>Yazı rengi <input id="textColor" type="color" value="#e5e7eb" aria-label="Yazı rengi"></label>
-        </div>
-        <div class="row">
-          <label>Yazı tipi
-            <select id="fontFamily" aria-label="Yazı tipi">
-              <option value="Arial, Helvetica, sans-serif">Arial</option>
-              <option value="Georgia, 'Times New Roman', serif">Georgia</option>
-              <option value="'Times New Roman', Times, serif">Times New Roman</option>
-              <option value="'Trebuchet MS', Arial, sans-serif">Trebuchet MS</option>
-              <option value="Verdana, Geneva, sans-serif">Verdana</option>
-              <option value="'Courier New', monospace">Courier New</option>
-            </select>
-          </label>
-          <label>Boyut <span id="fontSizeValue">18 px</span>
-            <input id="fontSize" type="range" min="14" max="30" step="1" value="18"></label>
-          <label>Satır aralığı <span id="lineHeightValue">1,65</span>
-            <input id="lineHeight" type="range" min="1.2" max="2.2" step="0.05" value="1.65"></label>
+          <label><input id="optIcons" type="checkbox"> Okuma düğmelerinde yalnızca simge göster (daha büyük düğmeler)</label>
           <button id="resetAppearanceBtn" type="button">Görünümü sıfırla</button>
         </div>
+        <p class="note">Arayüz pencere boyutuna göre kendiliğinden ölçeklenir; hangi ekranda olursan ol bütün düğmeler kaydırmadan görünür.</p>
       </div>
     </details>
 
     <details class="panel" id="dictPanel">
       <summary>📖 Kısaltma sözlüğü</summary>
       <div class="panel-body">
-        <p class="note">Her satıra <code>kısaltma = okunuşu</code> yaz. Büyük/küçük harfe duyarlıdır. Uzun kısaltmalar önce eşleşir. Sözlükteki noktalı kısaltmalar cümle bölmede de dikkate alınır: “s. 45” artık iki cümleye ayrılmaz.</p>
+        <p class="note">Her satıra <code>kısaltma = okunuşu</code> yaz. Büyük/küçük harfe duyarlıdır. Uzun kısaltmalar önce eşleşir. Sözlükteki noktalı kısaltmalar cümle bölmede de dikkate alınır: “s. 45” iki cümleye ayrılmaz.</p>
         <textarea id="dictText" spellcheck="false" aria-label="Kısaltma sözlüğü"></textarea>
         <div class="row">
           <button id="dictSaveBtn" type="button" class="primary">Sözlüğü kaydet</button>
@@ -317,15 +449,269 @@
     </details>
   </div>
 
-  <div class="status" id="saveStatus"></div>
+  <div class="status"><span id="saveStatus"></span><button id="undoBtn" type="button" hidden>↶ Geri al</button></div>
 </div>
 
+<input id="fileInput" type="file" hidden multiple
+  accept=".txt,.text,.md,.markdown,.pdf,.docx,.odt,.epub,.rtf,.html,.htm,.xhtml,.csv,.log,.srt,.vtt,text/plain,application/pdf">
+
+<div class="drop-zone" id="dropZone" hidden>
+  <div class="drop-card">
+    <div class="big">📄</div>
+    <h2>Dosyayı buraya bırak</h2>
+    <p>PDF, Word (.docx), EPUB, ODT, RTF, TXT, HTML ve Markdown dosyaları okunur.<br>Metin, eskisinin yerine geçer; istersen geri alabilirsin.</p>
+  </div>
+</div>
+
+<!-- Onay penceresi -->
 <div class="modal" id="confirmModal" hidden>
   <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="confirmText">
     <p id="confirmText"></p>
     <div class="modal-actions">
       <button id="confirmNo" type="button">Vazgeç</button>
       <button id="confirmYes" type="button" class="primary">Evet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Yardım -->
+<div class="modal" id="helpModal" hidden>
+  <div class="modal-box wide" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="dlg-head"><h2 id="helpTitle">Metin Okuyucu · Yardım</h2><button type="button" data-close>Kapat</button></div>
+    <div class="help-body">
+      <nav class="help-nav" id="helpNav" aria-label="Yardım bölümleri"></nav>
+      <div class="help-content" id="helpContent">
+
+<section data-title="1. Başlarken">
+<h3>Başlarken</h3>
+<p>Metin Okuyucu, uzun akademik metinleri <b>cümle cümle</b> sesli okuyan bir okuma ve redaksiyon aracıdır. Okunan cümlenin altı çizilir, okunan kelime renkle vurgulanır. Amaç, yazdığın metni dinleyerek gözden geçirmek: gereksiz bir tekrar, aksayan bir cümle ya da eksik bir ek, sesli okununca hemen fark edilir.</p>
+<h4>Üç adımda kullanım</h4>
+<ol>
+<li>Metnini yapıştır (<kbd>V</kbd>) ya da bir dosyayı sayfaya <b>sürükleyip bırak</b>.</li>
+<li><b>▶ Oku</b> düğmesine ya da <kbd>Boşluk</kbd> tuşuna bas.</li>
+<li>Sorunlu bir cümle duyduğunda <kbd>M</kbd> ile işaretle; okuma bitince işaretli cümleleri liste olarak kopyala.</li>
+</ol>
+<h4>Ekranın bölümleri</h4>
+<ul>
+<li><b>Üstte</b>: dosya açma, görünüm değiştirme, temizleme, yardım ve hakkında düğmeleri.</li>
+<li><b>Okuma düğmeleri</b>: baştan oku, önceki/sonraki cümle, oku/duraklat, cümleyi yinele, işaretle, durdur.</li>
+<li><b>Okunan cümle kutusu</b>: o an okunan cümle burada da görünür; <b>Kopyala</b> ile tek tıkla alırsın.</li>
+<li><b>Metin alanı</b>: düzenleme ve okuma görünümleri arasında <kbd>Esc</kbd> ile geçilir.</li>
+<li><b>Paneller</b>: ses ve okuma ayarları, görünüm, kısaltma sözlüğü ve işaretli cümleler.</li>
+</ul>
+<div class="tip">Kaldığın yer, metnin ve bütün ayarların bu tarayıcıda kendiliğinden saklanır. Sayfayı kapatıp açtığında aynı cümleden devam edersin.</div>
+</section>
+
+<section data-title="2. Metin ve dosya yükleme">
+<h3>Metin ve dosya yükleme</h3>
+<p>Metin dört yoldan gelir:</p>
+<ul>
+<li><b>Yapıştırmak</b>: metin alanına <kbd>Ctrl+V</kbd>; ya da metin alanı dışındayken <kbd>V</kbd> tuşu panodaki metni doğrudan yükler.</li>
+<li><b>Dosya aç</b> düğmesi ya da <kbd>Ctrl+O</kbd>.</li>
+<li><b>Sürükle-bırak</b>: dosyayı Gezgin'den sayfanın herhangi bir yerine bırak. Birden çok dosya bırakırsan sırayla arka arkaya eklenir.</li>
+<li>Başka bir programda seçtiğin metni sürükleyip bırakmak da olur.</li>
+</ul>
+<h4>Desteklenen biçimler</h4>
+<table>
+<tr><th>Biçim</th><th>Notlar</th></tr>
+<tr><td>PDF</td><td>Seçilebilir metin içeren PDF'ler. Satır sonundaki tirelemeler birleştirilir, tek başına duran sayfa numaraları atlanır, paragraflar korunur. Taranmış (görüntü) PDF'lerde metin yoktur. PDF okuyucusu ilk PDF'te bir kez internetten yüklenir.</td></tr>
+<tr><td>Word (.docx)</td><td>Paragraflar, başlıklar ve tablolar. Silinmiş izlenen değişiklikler okunmaz. Dipnotlar istersen metnin sonuna eklenir (Ses ve okuma paneli).</td></tr>
+<tr><td>EPUB</td><td>Bölümler kitaptaki okuma sırasıyla.</td></tr>
+<tr><td>ODT (LibreOffice)</td><td>Paragraflar ve başlıklar; dipnotlar isteğe bağlı.</td></tr>
+<tr><td>RTF</td><td>Biçimsiz metin olarak.</td></tr>
+<tr><td>TXT, Markdown, HTML, CSV, SRT</td><td>Türkçe karakterler UTF-8 ya da eski Windows Türkçe (1254) kodlamasında otomatik tanınır.</td></tr>
+</table>
+<p>Eski Word biçimi (.doc) desteklenmez; dosyayı Word'de açıp <b>.docx</b> olarak kaydetmen yeterli.</p>
+<div class="tip">Yeni metin yüklediğinde ya da metni temizlediğinde eski metin kaybolmaz: alttaki <b>↶ Geri al</b> düğmesi bir önceki metni geri getirir.</div>
+</section>
+
+<section data-title="3. Okuma ve gezinme">
+<h3>Okuma ve gezinme</h3>
+<ul>
+<li><b>▶ Oku / ⏸ Duraklat / ▶ Devam et</b>: <kbd>Boşluk</kbd>. Duraklatınca son okunan kelimeden devam eder.</li>
+<li><b>Baştan</b>: metnin tamamını ilk cümleden okur (<kbd>A</kbd>).</li>
+<li><b>Önceki / Sonraki</b> cümle: <kbd>←</kbd> / <kbd>→</kbd>. Okuma sürerken basarsan okuma yeni cümleden kesintisiz devam eder.</li>
+<li><b>Cümleyi baştan oku</b>: <kbd>R</kbd>. Tökezlediğin cümleyi bir daha dinlemek için.</li>
+<li><b>Bir cümleye çift tıklamak</b> okumayı o cümleden başlatır.</li>
+<li><b>İmleçten oku</b>: düzenleme görünümünde imlecin bulunduğu cümleden başlar.</li>
+<li><b>Seçili metni oku</b>: yalnızca seçtiğin bölümü okur.</li>
+<li><b>Durdur</b>: <kbd>Esc</kbd>. Okumayı bitirir ve imleci okunan cümleye koyarak düzenleme görünümüne döner; düzeltmeyi hemen yaparsın.</li>
+</ul>
+<h4>Duraklamalar</h4>
+<p><b>Ses ve okuma</b> panelinden cümle arası ve paragraf arası bekleme sürelerini ayarlayabilirsin. Paragraf arasına biraz daha uzun bir es koymak, metnin yapısını kulakla izlemeyi kolaylaştırır.</p>
+<p>Alttaki satır kaçıncı cümlede olduğunu, toplam kelime sayısını ve seçili hıza göre <b>kalan tahmini süreyi</b> gösterir.</p>
+</section>
+
+<section data-title="4. Sesler">
+<h3>Sesler</h3>
+<p>Metin Okuyucu, tarayıcının kendi seslendirme motorunu kullanır. Bu yüzden ses seçenekleri tarayıcıya göre değişir.</p>
+<h4>Önerilen: Microsoft Edge</h4>
+<p>Edge, ücretsiz ve çok doğal sinir ağı sesleri sunar. Liste şu sırayla dizilir:</p>
+<ol>
+<li><b>Türkçe doğal sesler</b>: Ahmet ve Emel.</li>
+<li><b>Çok dilli doğal sesler</b>: Brian, Andrew, Florian, Emma, Ava ve diğerleri. Bu sesler Türkçeyi de okur; üstelik metindeki İngilizce özetleri ya da alıntıları aynı sesle, doğru İngilizce telaffuzla seslendirir. Aksanı kulakla değerlendir.</li>
+<li>Diğer Türkçe sesler ve diğer diller.</li>
+</ol>
+<h4>Bulut sesi mi, cihaz sesi mi?</h4>
+<p>Ses seçiminin yanında bir etiket görünür:</p>
+<ul>
+<li><b>☁ Bulut sesi</b>: Seslendirme, tarayıcı üreticisinin sunucusunda yapılır. Okunan cümleler bu sunucuya gönderilir (Edge'de Microsoft, Chrome'da Google). Ses kalitesi yüksektir, internet gerekir.</li>
+<li><b>💻 Cihaz sesi</b>: Seslendirme bilgisayarında yapılır; metin cihazdan çıkmaz.</li>
+</ul>
+<div class="tip">Yayımlanmamış bir metni dinlerken bu ayrımı bilmekte yarar var. Tamamen yerel çalışmak istersen listeden 💻 etiketli bir ses seç.</div>
+<h4>Hız ve perde</h4>
+<p>Hız 0,5× ile 2× arasında, perde 0,7 ile 1,3 arasında ayarlanır. Okuma sürerken değiştirirsen değişiklik son okunan kelimeden itibaren hemen uygulanır.</p>
+</section>
+
+<section data-title="5. Redaksiyon araçları">
+<h3>Redaksiyon araçları</h3>
+<h4>İşaretleme</h4>
+<p>Dinlerken sorunlu bir cümlede <kbd>M</kbd> tuşuna bas ya da <b>★ İşaretle</b> düğmesini kullan. İşaretli cümleler sarı zeminle görünür ve <b>İşaretli cümleler</b> panelinde listelenir. Listede bir cümleye tıklarsan o cümleye gidersin; <b>Listeyi kopyala</b> ile hepsini numaralı olarak panoya alırsın.</p>
+<p>Bir cümleyi düzelttiğinde listede üstü çizili görünür: “bu cümle artık metinde yok”, yani düzeltilmiş demektir.</p>
+<h4>Uzun cümle uyarısı</h4>
+<p>Belirlediğin kelime sayısını (varsayılan 40) aşan cümlelerin altında kırmızı bir çizgi görünür. Fareyle üzerine gelince kelime sayısını gösterir.</p>
+<h4>Kopyalama</h4>
+<p><b>⧉ Kopyala</b> düğmesi ya da <kbd>C</kbd> tuşu okunan cümleyi panoya alır. Cümleyi Word'de aratıp bulmanın en hızlı yolu budur.</p>
+</section>
+
+<section data-title="6. Akademik metin desteği">
+<h3>Akademik metin desteği</h3>
+<h4>Türkçe akademik metne uygun cümle bölme</h4>
+<p>Sıradan cümle bölücüler her noktada keser. Metin Okuyucu şu durumlarda cümleyi bölmez:</p>
+<ul>
+<li>Kaynak gösterme kısaltmaları: “s. 45”, “a.g.e.”, “vd.”, “bkz.”</li>
+<li>Unvanlar ve ad baş harfleri: “Prof. Dr.”, “M. Kemal”</li>
+<li>Sıra sayıları: “I. Dünya Savaşı”, “XX. yüzyıl”, “3. Beş Yıllık Kalkınma Planı”</li>
+</ul>
+<h4>Okunuş düzeltmeleri</h4>
+<ul>
+<li>Noktalı Roma rakamları sıra sayısı olarak okunur: “XX. yüzyıl” → yirminci yüzyıl.</li>
+<li>Kısaltmalar sözlükteki karşılığıyla okunur: “bkz.” → bakınız, “TBMM” → Te Be Me Me.</li>
+</ul>
+<h4>Kısaltma sözlüğü</h4>
+<p>Kendi kısaltmalarını <b>Kısaltma sözlüğü</b> panelinde her satıra bir tane gelecek biçimde ekle: <code>DPT = De Pe Te</code>. Sözlük büyük/küçük harfe duyarlıdır; <code>#</code> ile başlayan satırlar açıklamadır.</p>
+</section>
+
+<section data-title="7. Görünüm">
+<h3>Görünüm</h3>
+<ul>
+<li><b>Temalar</b>: koyu ve açık olmak üzere yirmiden fazla hazır tema, iki yüksek karşıtlık teması ve kendi renklerinle kuracağın <b>Özel</b> tema.</li>
+<li><b>Yazı tipi</b>: bilgisayarında kurulu olan yazı tipleri otomatik bulunur. “İnternetten” grubundaki okuma yazı tipleri (Literata, Merriweather, Atkinson Hyperlegible vb.) seçildiğinde Google Fonts'tan yüklenir.</li>
+<li><b>Boyut, satır aralığı, harf ve kelime aralığı, kalınlık</b>.</li>
+<li><b>Satır genişliği</b>: geniş ekranda satırlar çok uzarsa göz yorulur. “Kitap (70 karakter)” seçeneği basılı kitaptaki satır uzunluğuna yakındır.</li>
+<li><b>Hizalama</b>: sola yaslı ya da iki yana yaslı (Türkçe heceleme ile).</li>
+<li><b>Yalnızca simge</b>: okuma düğmelerindeki yazıları kaldırır, düğmeleri büyütür.</li>
+</ul>
+<div class="tip">Arayüz pencere boyutuna göre kendiliğinden ölçeklenir. Küçük bir pencerede ya da bölünmüş ekranda bile bütün düğmeler kaydırmaya gerek kalmadan görünür.</div>
+</section>
+
+<section data-title="8. Klavye kısayolları">
+<h3>Klavye kısayolları</h3>
+<p>Tek tuşlu kısayollar metin alanının <b>dışındayken</b> çalışır (okuma görünümünde ya da metin alanından çıkınca). Metin alanındayken <kbd>Esc</kbd> seni okuma görünümüne geçirir.</p>
+<table>
+<tr><th>Tuş</th><th>İşlev</th></tr>
+<tr><td><kbd>Boşluk</kbd></td><td>Oku / duraklat / devam et</td></tr>
+<tr><td><kbd>A</kbd></td><td>Tümünü en baştan oku</td></tr>
+<tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Önceki / sonraki cümle</td></tr>
+<tr><td><kbd>R</kbd></td><td>Cümleyi baştan oku</td></tr>
+<tr><td><kbd>M</kbd></td><td>Cümleyi işaretle ya da işareti kaldır</td></tr>
+<tr><td><kbd>C</kbd></td><td>Okunan cümleyi kopyala</td></tr>
+<tr><td><kbd>V</kbd></td><td>Panodaki metni yapıştır (eskisinin yerine geçer)</td></tr>
+<tr><td><kbd>E</kbd></td><td>Metni temizle (geri alınabilir)</td></tr>
+<tr><td><kbd>Ctrl+O</kbd></td><td>Dosya aç</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Okumayı durdur; okuma ve düzenleme görünümü arasında geç</td></tr>
+<tr><td><kbd>F1</kbd></td><td>Bu yardım penceresi</td></tr>
+<tr><td>Çift tık</td><td>O cümleden okumaya başla</td></tr>
+</table>
+<p>Kısayollar Türkçe Q ve F klavyelerde harfin kendisine göre çalışır.</p>
+</section>
+
+<section data-title="9. Gizlilik ve veriler">
+<h3>Gizlilik ve veriler</h3>
+<ul>
+<li><b>Metnin saklandığı yer</b>: Yalnızca bu tarayıcının yerel hafızası. Metin herhangi bir sunucuya kaydedilmez, başka cihaza ya da tarayıcıya taşınmaz.</li>
+<li><b>Dosyalar</b>: Açtığın dosyalar tamamen tarayıcının içinde, bilgisayarında işlenir; hiçbir yere yüklenmez.</li>
+<li><b>Seslendirme</b>: <b>☁ Bulut sesi</b> seçiliyse okunan cümleler, sesi üretmesi için tarayıcı üreticisinin sunucusuna gider. <b>💻 Cihaz sesi</b> seçiliyse metin bilgisayardan çıkmaz.</li>
+<li><b>Dış bağlantılar</b>: Sayfa yalnızca iki durumda internete bağlanır: ilk PDF'te PDF okuyucusunu (Mozilla PDF.js) indirmek için ve “İnternetten” grubundan bir yazı tipi seçersen yazı tipini indirmek için. Bu isteklerle metnin gönderilmez.</li>
+</ul>
+<div class="tip">Tarayıcı verilerini temizlersen kayıtlı metin de silinir. Asıl metnini her zaman kendi dosyanda sakla; Metin Okuyucu bir okuma aracıdır, arşiv değil.</div>
+</section>
+
+<section data-title="10. Sorun giderme">
+<h3>Sorun giderme</h3>
+<h4>Ses listesinde Ahmet, Emel ya da çok dilli sesler yok</h4>
+<p>Bu sesler yalnızca <b>Microsoft Edge</b>'de ve internet bağlantısı varken görünür. Chrome ya da Firefox'ta yalnızca o tarayıcının ve işletim sisteminin sesleri listelenir.</p>
+<h4>Okuma birden duruyor ya da başlamıyor</h4>
+<p>Bulut seslerinde bağlantı kısa süreliğine koparsa okuma durabilir. <kbd>R</kbd> ile cümleyi yeniden başlat ya da başka bir ses seç.</p>
+<h4>PDF'ten gelen metin karışık</h4>
+<p>PDF bir sayfa düzeni biçimidir, metin biçimi değil. Çok sütunlu sayfalar, kenar notları ve dipnotlar metnin arasına karışabilir. Elinde aynı belgenin Word sürümü varsa onu açmak her zaman daha temiz sonuç verir.</p>
+<h4>“Pano izni verilmedi” uyarısı</h4>
+<p><kbd>V</kbd> kısayolu panoyu okumak için tarayıcı izni ister. İzin vermek istemezsen metin alanına tıklayıp <kbd>Ctrl+V</kbd> ile yapıştırman yeterli.</p>
+<h4>Cümle yanlış yerden bölünüyor</h4>
+<p>Bölünmeye yol açan kısaltmayı (noktasıyla birlikte) <b>Kısaltma sözlüğü</b>ne ekle. Sözlükteki noktalı kısaltmalarda cümle bölünmez.</p>
+<p>Bir hata bulursan ya da önerin varsa: <a href="mailto:berkcel@gmail.com">berkcel@gmail.com</a></p>
+</section>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hakkında -->
+<div class="modal" id="aboutModal" hidden>
+  <div class="modal-box wide" style="max-width:620px;height:auto" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <div class="dlg-head"><h2 id="aboutTitle">Hakkında</h2><button type="button" data-close>Kapat</button></div>
+    <div class="about">
+      <div class="about-top">
+        <svg class="about-logo" viewBox="0 0 80 80" aria-hidden="true">
+          <rect x="2" y="2" width="76" height="76" rx="18" fill="var(--primary-bg)" stroke="var(--primary-border)" stroke-width="2"/>
+          <rect x="16" y="22" width="30" height="5" rx="2.5" fill="var(--text)" opacity=".9"/>
+          <rect x="16" y="33" width="24" height="5" rx="2.5" fill="var(--text)" opacity=".7"/>
+          <rect x="16" y="44" width="28" height="5" rx="2.5" fill="var(--word-bg)"/>
+          <rect x="16" y="55" width="18" height="5" rx="2.5" fill="var(--text)" opacity=".5"/>
+          <path d="M53 31 q6 9 0 18" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>
+          <path d="M60 25 q11 15 0 30" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" opacity=".7"/>
+        </svg>
+        <div>
+          <p class="about-name">Metin Okuyucu</p>
+          <div class="about-ver">Sürüm 4.0 · Tarayıcıda çalışan sesli okuma ve redaksiyon aracı</div>
+        </div>
+      </div>
+      <p class="about-lead">Metin Okuyucu, <b>Berkay Çelik</b> tarafından akademik çalışmalara yardımcı olmak amacıyla tasarlanmış ve geliştirilmiştir. Uzun metinleri cümle cümle seslendirerek yazarın kendi metnini kulakla gözden geçirmesini sağlar.</p>
+      <dl class="about-grid">
+        <dt>Geliştirici</dt><dd>Berkay Çelik</dd>
+        <dt>İletişim</dt><dd><a href="mailto:berkcel@gmail.com">berkcel@gmail.com</a></dd>
+        <dt>Adres</dt><dd><a href="https://berquai.github.io/metin-okuyucu/" target="_blank" rel="noopener">berquai.github.io/metin-okuyucu</a></dd>
+        <dt>Kaynak kodu</dt><dd><a href="https://github.com/berquai/metin-okuyucu" target="_blank" rel="noopener">github.com/berquai/metin-okuyucu</a></dd>
+        <dt>Lisans</dt><dd>MIT Lisansı</dd>
+        <dt>Teknoloji</dt><dd>Tek HTML dosyası; Web Speech API, Intl.Segmenter, yerleşik ZIP çözücü. Kurulum ve sunucu gerektirmez.</dd>
+        <dt>Üçüncü taraf</dt><dd>PDF.js © Mozilla, Apache 2.0 Lisansı (yalnızca PDF açıldığında yüklenir). İsteğe bağlı yazı tipleri: Google Fonts, SIL Open Font License.</dd>
+      </dl>
+      <details>
+        <summary style="cursor:pointer;color:var(--muted)">Lisans metnini göster</summary>
+<pre class="license-text">MIT License
+
+Copyright (c) 2026 Berkay Çelik
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+      </details>
+      <div class="about-foot">© 2026 Berkay Çelik. Bu yazılımı özgürce kullanabilir, değiştirebilir ve paylaşabilirsin; yeter ki telif ve lisans notunu koru.</div>
     </div>
   </div>
 </div>
@@ -578,20 +964,543 @@ function wordRangeAt(S, off) {
   while (s < k - 1 && /[(«"“‘\[]/.test(S[s])) s++;
   return k > s ? [s, k] : null;
 }
+
+// ---------- Sesler ----------
+// Öncelik: Ahmet → Emel → çok dilli doğal sesler (Brian, Andrew, Florian, Emma, Ava, diğerleri)
+// → diğer doğal Türkçe → çevrimiçi Türkçe → diğer Türkçe → diğer diller.
+const MULTI_ORDER = ['brian', 'andrew', 'florian', 'emma', 'ava'];
+function isMultilingual(v) { return /multilingual/i.test(v.name || ''); }
+function voiceRank(v) {
+  const tr = /^tr([-_]|$)/i.test(v.lang || ''), n = v.name || '';
+  const neural = /natural|neural/i.test(n), online = /online|google|premium|enhanced|wavenet/i.test(n);
+  if (tr && /ahmet/i.test(n) && (neural || online)) return 0;
+  if (tr && /emel/i.test(n) && (neural || online)) return 1;
+  if (isMultilingual(v)) {
+    const k = MULTI_ORDER.findIndex(x => n.toLowerCase().includes(x));
+    return 2 + (k < 0 ? MULTI_ORDER.length : k) / 10;
+  }
+  if (tr && neural) return 3;
+  if (tr && online) return 4;
+  if (tr) return 5;
+  return neural ? 6 : online ? 7 : 8;
+}
+function voiceGroup(v) {
+  const r = voiceRank(v);
+  return r < 2 ? 'Türkçe doğal sesler' : r < 3 ? 'Çok dilli doğal sesler (Türkçe de okur)'
+    : r < 6 ? 'Diğer Türkçe sesler' : 'Diğer diller';
+}
+function sortVoices(list) {
+  return [...list].sort((a, b) =>
+    voiceRank(a) - voiceRank(b) || (a.lang || '').localeCompare(b.lang || '') || (a.name || '').localeCompare(b.name || ''));
+}
+function shortVoiceName(v) {
+  // "Microsoft AvaMultilingual Online (Natural) - English (United States)" → "Ava (çok dilli) — en-US"
+  let n = v.name || '';
+  const m = n.match(/^Microsoft\s+(\w+?)(Multilingual)?\s+Online\s*\(Natural\)/i);
+  if (m) n = m[1] + (m[2] ? ' (çok dilli)' : ' (doğal)');
+  return `${n} — ${v.lang}`;
+}
+
+// ---------- Renkler ----------
+function hexToRgb(h) {
+  let c = String(h || '').replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  if (!/^[0-9a-f]{6}$/i.test(c)) return [0, 0, 0];
+  return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+}
+function rgbToHex(r) { return '#' + r.map(x => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join(''); }
+function mix(a, b, t) { const x = hexToRgb(a), y = hexToRgb(b); return rgbToHex(x.map((v, i) => v + (y[i] - v) * t)); }
+function rgba(h, a) { const [r, g, b] = hexToRgb(h); return `rgba(${r},${g},${b},${a})`; }
+function luminance(h) { const [r, g, b] = hexToRgb(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
+function isLightColor(h) { return luminance(h) > 0.6; }
+// Dört temel renkten (arka plan, yazı, vurgu, okunan kelime) bütün arayüz tonlarını türetir.
+function deriveTheme(t) {
+  const dark = !isLightColor(t.bg);
+  return {
+    bg: t.bg, text: t.text,
+    panel: mix(t.bg, t.text, dark ? 0.06 : 0.045),
+    line: mix(t.bg, t.text, t.hc ? 0.6 : 0.2),
+    muted: mix(t.text, t.bg, t.hc ? 0.12 : 0.3),
+    btnBg: mix(t.bg, t.text, dark ? 0.1 : 0.06),
+    btnBorder: mix(t.bg, t.text, t.hc ? 0.7 : 0.28),
+    btnHover: mix(t.bg, t.text, dark ? 0.17 : 0.12),
+    primaryBg: mix(t.bg, t.accent, dark ? 0.38 : 0.22),
+    primaryBorder: mix(t.bg, t.accent, 0.7),
+    accent: t.accent, underline: t.accent, sentBg: rgba(t.accent, dark ? 0.12 : 0.09),
+    wordBg: t.word, wordText: isLightColor(t.word) || luminance(t.word) > 0.5 ? '#111111' : '#ffffff',
+    markBg: t.hc ? rgba(t.accent, 0.3) : (dark ? 'rgba(250,204,21,.22)' : 'rgba(234,179,8,.26)'),
+    long: dark ? '#f87171' : '#c81e1e'
+  };
+}
 // ===== END_PURE =====
+
+// ===== BEGIN_FILES: dosya okuyucular (tarayıcı API'lerini kullanır, ağ gerektirmez; PDF hariç) =====
+const FILE_EXT_RE = /\.([a-z0-9]+)$/i;
+
+// Türkçe metin dosyaları için kodlama tahmini: UTF-8 → UTF-16 (BOM) → Windows-1254.
+function decodeText(buf) {
+  const b = new Uint8Array(buf);
+  if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b);
+  if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b);
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
+  catch (_) {
+    try { return new TextDecoder('windows-1254').decode(b); } catch (__) { return new TextDecoder('latin1').decode(b); }
+  }
+}
+
+// Paragrafları korur, fazla boş satırları ve satır sonu boşluklarını temizler.
+function tidyText(s) {
+  return String(s || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/ /g, ' ')
+    .replace(/[​­﻿]/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+(?=\S)/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// --- Küçük ZIP okuyucu (DOCX, ODT ve EPUB birer ZIP arşividir) ---
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('Bu tarayıcı sıkıştırılmış dosyaları açamıyor; güncel bir Edge, Chrome ya da Firefox kullan.');
+  const ds = new DecompressionStream('deflate-raw');
+  const stream = new Blob([bytes]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+function readZipDirectory(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('Dosya bozuk ya da beklenen biçimde değil.');
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const entries = new Map();
+  const dec = new TextDecoder('utf-8');
+  for (let n = 0; n < count && p + 46 <= u8.length; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true);
+    const csize = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true), extraLen = dv.getUint16(p + 30, true), cmtLen = dv.getUint16(p + 32, true);
+    const local = dv.getUint32(p + 42, true);
+    const name = dec.decode(u8.subarray(p + 46, p + 46 + nameLen));
+    entries.set(name, { method, csize, local });
+    p += 46 + nameLen + extraLen + cmtLen;
+  }
+  return entries;
+}
+async function zipOpen(buf) {
+  const entries = readZipDirectory(buf);
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  const lower = new Map([...entries.keys()].map(k => [k.toLowerCase(), k]));
+  async function bytes(name) {
+    const key = entries.has(name) ? name : lower.get(String(name).toLowerCase());
+    if (!key) return null;
+    const e = entries.get(key);
+    const lh = e.local;
+    const start = lh + 30 + dv.getUint16(lh + 26, true) + dv.getUint16(lh + 28, true);
+    const data = u8.subarray(start, start + e.csize);
+    if (e.method === 0) return data;
+    if (e.method === 8) return inflateRaw(data);
+    throw new Error('Desteklenmeyen sıkıştırma yöntemi.');
+  }
+  async function text(name) { const b = await bytes(name); return b ? new TextDecoder('utf-8').decode(b) : null; }
+  return { names: [...entries.keys()], bytes, text };
+}
+
+function parseXml(src) {
+  const doc = new DOMParser().parseFromString(src, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) {
+    // Bazı EPUB'lar XML kurallarına tam uymaz; HTML olarak dene.
+    return new DOMParser().parseFromString(src, 'text/html');
+  }
+  return doc;
+}
+const ln = el => (el.localName || el.nodeName || '').toLowerCase();
+
+// --- Word (.docx) ---
+function docxRunsText(p) {
+  let s = '';
+  const walk = node => {
+    for (const c of node.childNodes) {
+      if (c.nodeType !== 1) continue;
+      const n = ln(c);
+      if (n === 't') s += c.textContent;
+      else if (n === 'tab' || n === 'ptab') s += '\t';
+      else if (n === 'br' || n === 'cr') s += '\n';
+      else if (n === 'nobreakhyphen') s += '-';
+      else if (n === 'deltext' || n === 'instrtext' || n === 'del' || n === 'footnotereference' || n === 'endnotereference') continue;
+      else if (n === 'p') continue;            // iç içe paragraf (metin kutusu) ayrıca işlenir
+      else walk(c);
+    }
+  };
+  walk(p);
+  return s;
+}
+function docxParagraphs(root) {
+  const out = [];
+  const all = root.getElementsByTagNameNS('*', 'p');
+  for (const p of all) {
+    if (ln(p) !== 'p') continue;
+    // Metin kutusu içindeki yedek (VML) kopyaları atla; DrawingML sürümü zaten okunuyor.
+    let skip = false;
+    for (let a = p.parentNode; a; a = a.parentNode) { if (ln(a) === 'fallback') { skip = true; break; } }
+    if (!skip) out.push(docxRunsText(p));
+  }
+  return out;
+}
+async function readDocx(buf, opts) {
+  const z = await zipOpen(buf);
+  const xml = await z.text('word/document.xml');
+  if (!xml) throw new Error('Word belgesinin içeriği bulunamadı.');
+  const doc = parseXml(xml);
+  const body = doc.getElementsByTagNameNS('*', 'body')[0] || doc.documentElement;
+  let text = docxParagraphs(body).join('\n');
+  if (opts && opts.footnotes) {
+    const fx = await z.text('word/footnotes.xml');
+    if (fx) {
+      const order = [];
+      for (const r of doc.getElementsByTagNameNS('*', 'footnoteReference')) {
+        const id = r.getAttributeNS(r.namespaceURI, 'id') || r.getAttribute('w:id');
+        if (id && !order.includes(id)) order.push(id);
+      }
+      const fdoc = parseXml(fx), byId = new Map();
+      for (const f of fdoc.getElementsByTagNameNS('*', 'footnote')) {
+        const id = f.getAttributeNS(f.namespaceURI, 'id') || f.getAttribute('w:id');
+        const type = f.getAttributeNS(f.namespaceURI, 'type') || f.getAttribute('w:type');
+        if (type && type !== 'normal') continue;
+        byId.set(id, tidyText(docxParagraphs(f).join(' ')));
+      }
+      const notes = order.map((id, i) => byId.get(id) ? `${i + 1}. ${byId.get(id)}` : '').filter(Boolean);
+      if (notes.length) text += '\n\nDipnotlar\n\n' + notes.join('\n');
+    }
+  }
+  return tidyText(text);
+}
+
+// --- OpenDocument (.odt) ---
+async function readOdt(buf, opts) {
+  const z = await zipOpen(buf);
+  const xml = await z.text('content.xml');
+  if (!xml) throw new Error('ODT belgesinin içeriği bulunamadı.');
+  const doc = parseXml(xml);
+  const notes = [];
+  const inline = node => {
+    let s = '';
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) { s += c.nodeValue; continue; }
+      if (c.nodeType !== 1) continue;
+      const n = ln(c);
+      if (n === 's') s += ' '.repeat(Math.max(1, parseInt(c.getAttributeNS(c.namespaceURI, 'c') || '1', 10)));
+      else if (n === 'tab') s += '\t';
+      else if (n === 'line-break') s += '\n';
+      else if (n === 'note') {
+        const body = [...c.childNodes].find(x => ln(x) === 'note-body');
+        if (body) notes.push(tidyText([...body.getElementsByTagNameNS('*', 'p')].map(inline).join(' ')));
+      }
+      else if (n === 'tracked-changes' || n === 'bookmark-start' || n === 'bookmark-end') continue;
+      else s += inline(c);
+    }
+    return s;
+  };
+  const officeText = doc.getElementsByTagNameNS('*', 'text')[0];
+  const root = [...doc.getElementsByTagNameNS('*', 'body')][0] || doc.documentElement;
+  const paras = [];
+  const walk = node => {
+    for (const c of node.childNodes) {
+      if (c.nodeType !== 1) continue;
+      const n = ln(c);
+      if (n === 'p' || n === 'h') paras.push(inline(c));
+      else if (n === 'tracked-changes' || n === 'note') continue;
+      else walk(c);
+    }
+  };
+  walk(officeText && officeText !== root ? officeText : root);
+  let text = paras.join('\n');
+  if (opts && opts.footnotes && notes.length) text += '\n\nDipnotlar\n\n' + notes.map((t, i) => `${i + 1}. ${t}`).join('\n');
+  return tidyText(text);
+}
+
+// --- HTML ---
+const BLOCK_TAGS = new Set(['p', 'div', 'section', 'article', 'header', 'footer', 'main', 'aside', 'blockquote',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'ul', 'ol', 'dl', 'dt', 'dd', 'tr', 'table', 'pre', 'figure',
+  'figcaption', 'hr', 'nav', 'address', 'caption', 'tbody', 'thead', 'body']);
+function htmlToText(src) {
+  const doc = typeof src === 'string' ? new DOMParser().parseFromString(src, 'text/html') : src;
+  const root = doc.body || doc.documentElement;
+  let out = '';
+  const walk = node => {
+    for (const c of node.childNodes) {
+      if (c.nodeType === 3) { out += c.nodeValue.replace(/\s+/g, ' '); continue; }
+      if (c.nodeType !== 1) continue;
+      const n = ln(c);
+      if (n === 'script' || n === 'style' || n === 'head' || n === 'noscript' || n === 'template' || n === 'svg') continue;
+      if (n === 'br') { out += '\n'; continue; }
+      // Dipnot göndermeleri (üst simge numaralar) okunmasın: "s. 45).1" → "s. 45)."
+      if (n === 'sup' && /^\s*[\d*†‡]{1,4}\s*$/.test(c.textContent)) continue;
+      if (n === 'a' && /noteref|footnote|sdfootnoteanc|endnoteanc/i.test((c.getAttribute('epub:type') || '') + ' ' + (c.getAttribute('class') || '') + ' ' + (c.getAttribute('role') || ''))
+          && /^\s*\[?[\d*]{1,4}\]?\s*$/.test(c.textContent)) continue;
+      if (n === 'td' || n === 'th') { walk(c); out += '\t'; continue; }
+      const block = BLOCK_TAGS.has(n);
+      if (block) out += '\n';
+      walk(c);
+      if (block) out += '\n';
+    }
+  };
+  if (root) walk(root);
+  return tidyText(out.replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{2,}/g, '\n'));
+}
+
+// --- EPUB ---
+function resolvePath(base, rel) {
+  const parts = (base ? base.split('/').slice(0, -1) : []).concat(decodeURIComponent(rel.split('#')[0]).split('/'));
+  const out = [];
+  for (const p of parts) { if (p === '..') out.pop(); else if (p && p !== '.') out.push(p); }
+  return out.join('/');
+}
+async function readEpub(buf) {
+  const z = await zipOpen(buf);
+  const cont = await z.text('META-INF/container.xml');
+  let opfPath = '';
+  if (cont) { const rf = parseXml(cont).getElementsByTagNameNS('*', 'rootfile')[0]; opfPath = rf ? rf.getAttribute('full-path') : ''; }
+  if (!opfPath) opfPath = z.names.find(n => /\.opf$/i.test(n)) || '';
+  if (!opfPath) throw new Error('EPUB içindekiler dosyası bulunamadı.');
+  const opf = parseXml(await z.text(opfPath));
+  const manifest = new Map();
+  for (const it of opf.getElementsByTagNameNS('*', 'item')) manifest.set(it.getAttribute('id'), it.getAttribute('href'));
+  const spine = [...opf.getElementsByTagNameNS('*', 'itemref')].map(r => r.getAttribute('idref'));
+  const parts = [];
+  for (const id of spine) {
+    const href = manifest.get(id);
+    if (!href) continue;
+    const src = await z.text(resolvePath(opfPath, href));
+    if (!src) continue;
+    const t = htmlToText(src);
+    if (t) parts.push(t);
+  }
+  return tidyText(parts.join('\n\n'));
+}
+
+// --- RTF ---
+function rtfToText(src) {
+  let cp = 1254;
+  const m = src.match(/\\ansicpg(\d+)/);
+  if (m) cp = parseInt(m[1], 10);
+  let dec;
+  try { dec = new TextDecoder('windows-' + cp); } catch (_) { dec = new TextDecoder('windows-1254'); }
+  const SKIP = new Set(['fonttbl', 'colortbl', 'stylesheet', 'info', 'pict', 'header', 'footer', 'headerl', 'headerr',
+    'footerl', 'footerr', 'listtable', 'listoverridetable', 'rsidtbl', 'generator', 'xmlnstbl', 'themedata', 'datastore',
+    'latentstyles', 'colorschememapping', 'object', 'fldinst', 'footnote']);
+  const stack = [];
+  let skip = false, uc = 1, pendingSkip = 0, out = '', bytes = [];
+  const flushBytes = () => { if (bytes.length) { out += dec.decode(new Uint8Array(bytes)); bytes = []; } };
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '{') { flushBytes(); stack.push({ skip, uc }); continue; }
+    if (ch === '}') { flushBytes(); const s = stack.pop(); if (s) { skip = s.skip; uc = s.uc; } continue; }
+    if (ch === '\\') {
+      const nx = src[i + 1];
+      if (nx === '\\' || nx === '{' || nx === '}') { flushBytes(); if (!skip) out += nx; i++; continue; }
+      if (nx === "'") {
+        const hex = src.substr(i + 2, 2); i += 3;
+        if (pendingSkip > 0) { pendingSkip--; continue; }
+        if (!skip) bytes.push(parseInt(hex, 16));
+        continue;
+      }
+      if (nx === '*') { skip = true; i++; continue; }
+      if (nx === '~') { flushBytes(); if (!skip) out += ' '; i++; continue; }
+      if (nx === '-' || nx === '_') { i++; continue; }
+      if (nx === '\n' || nx === '\r') { flushBytes(); if (!skip) out += '\n'; i++; continue; }
+      const mm = /^([a-zA-Z]+)(-?\d+)? ?/.exec(src.slice(i + 1, i + 40));
+      if (!mm) { i++; continue; }
+      i += mm[0].length;
+      const word = mm[1], arg = mm[2] !== undefined ? parseInt(mm[2], 10) : null;
+      flushBytes();
+      if (SKIP.has(word)) { skip = true; continue; }
+      if (skip) continue;
+      if (word === 'par' || word === 'line' || word === 'row') out += '\n';
+      else if (word === 'tab' || word === 'cell') out += '\t';
+      else if (word === 'emdash') out += '—';
+      else if (word === 'endash') out += '–';
+      else if (word === 'lquote') out += '‘';
+      else if (word === 'rquote') out += '’';
+      else if (word === 'ldblquote') out += '“';
+      else if (word === 'rdblquote') out += '”';
+      else if (word === 'bullet') out += '•';
+      else if (word === 'uc' && arg !== null) uc = arg;
+      else if (word === 'u' && arg !== null) { out += String.fromCharCode(arg < 0 ? arg + 65536 : arg); pendingSkip = uc; }
+      continue;
+    }
+    if (ch === '\r' || ch === '\n') continue;
+    if (pendingSkip > 0) { pendingSkip--; continue; }
+    flushBytes();
+    if (!skip) out += ch;
+  }
+  flushBytes();
+  return tidyText(out);
+}
+
+// --- Markdown: işaretleri sadeleştirir ---
+function markdownToText(s) {
+  return tidyText(String(s)
+    .replace(/```[\s\S]*?```/g, m => m.replace(/```\w*/g, ''))
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__)(.+?)\1/g, '$2')
+    .replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?=[^\w*]|$)/g, '$1$2')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s*([-*_])\1{2,}\s*$/gm, ''));
+}
+
+// --- Altyazı (SRT/VTT): zaman damgalarını ve sıra numaralarını atar ---
+function subtitleToText(s) {
+  return tidyText(String(s).replace(/^WEBVTT.*$/m, '')
+    .split(/\r?\n/)
+    .filter(l => !/^\d+$/.test(l.trim()) && !/-->/.test(l))
+    .join('\n'));
+}
+
+// --- PDF (Mozilla PDF.js, ilk PDF'te bir kez yüklenir) ---
+const PDFJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let pdfjsLoading = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (pdfjsLoading) return pdfjsLoading;
+  pdfjsLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = PDFJS_BASE + 'pdf.min.js';
+    s.onload = () => {
+      if (!window.pdfjsLib) { reject(new Error('PDF okuyucusu yüklenemedi.')); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.js';
+      resolve(window.pdfjsLib);
+    };
+    s.onerror = () => { pdfjsLoading = null; reject(new Error('PDF okuyucusu yüklenemedi. İnternet bağlantını kontrol et.')); };
+    document.head.appendChild(s);
+  });
+  return pdfjsLoading;
+}
+// Bir sayfanın metin öğelerinden satırlar ve paragraflar kurar.
+function pdfPageParagraphs(items) {
+  const lines = [];
+  let cur = null;
+  const hs = items.filter(it => it.str && it.str.trim()).map(it => Math.abs(it.transform[3]) || it.height || 10).sort((a, b) => a - b);
+  const typicalH = hs.length ? hs[Math.floor(hs.length / 2)] : 10;
+  for (const it of items) {
+    if (typeof it.str !== 'string') continue;
+    const x = it.transform[4], y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
+    // Üst simge dipnot numaralarını atla ("…s. 45).¹").
+    if (h < typicalH * 0.8 && /^\s*[\d*†‡]{1,4}\s*$/.test(it.str)) continue;
+    if (!cur || Math.abs(y - cur.y) > h * 0.45) {
+      if (cur && cur.text.trim()) lines.push(cur);
+      cur = { text: '', x, y, h, xEnd: x };
+    }
+    // Aynı satırdaki öğeler arasında boşluk yoksa ve arada mesafe varsa boşluk ekle.
+    if (cur.text && !/\s$/.test(cur.text) && it.str && !/^\s/.test(it.str) && x - cur.xEnd > h * 0.15) cur.text += ' ';
+    cur.text += it.str;
+    cur.xEnd = x + (it.width || 0);
+    if (it.hasEOL) { if (cur.text.trim()) lines.push(cur); cur = null; }
+  }
+  if (cur && cur.text.trim()) lines.push(cur);
+  // Tek başına duran sayfa numaralarını at.
+  const clean = lines.filter(l => !/^\s*[-–—]?\s*(\d{1,4}|[ivxlcdm]{1,7})\s*[-–—]?\s*$/i.test(l.text));
+  if (!clean.length) return [];
+  const gaps = [];
+  for (let i = 1; i < clean.length; i++) { const g = clean[i - 1].y - clean[i].y; if (g > 0) gaps.push(g); }
+  gaps.sort((a, b) => a - b);
+  // Satır aralığı: paragraf boşlukları sayıca baskın olabilir; bu yüzden ortanca değil alt çeyrek alınır.
+  const med = gaps.length ? gaps[Math.floor(gaps.length / 4)] : 14;
+  const minX = Math.min(...clean.map(l => l.x));
+  const maxEnd = Math.max(...clean.map(l => l.xEnd));
+  const paras = [];
+  let p = '';
+  clean.forEach((l, i) => {
+    const t = l.text.replace(/\s+/g, ' ').trim();
+    if (i > 0) {
+      const prev = clean[i - 1];
+      const gap = prev.y - l.y;
+      const indent = l.x - minX > l.h * 1.2 && Math.abs(prev.x - minX) < l.h * 0.6;
+      // Cümleyle biten ve satırın sonuna kadar uzanmayan satır, paragraf sonudur.
+      const shortEnd = /[.!?…:"”»)]$/.test(prev.text.trim()) && prev.xEnd < maxEnd - prev.h * 4;
+      const sizeChange = Math.abs(l.h - prev.h) > Math.max(1.2, prev.h * 0.12);   // başlık ↔ gövde geçişi
+      if (gap > med * 1.45 || gap < 0 || indent || shortEnd || sizeChange) { paras.push(p); p = ''; }
+    }
+    if (!p) p = t;
+    else if (/[\p{L}]-$/u.test(p) && /^\p{Ll}/u.test(t)) p = p.slice(0, -1) + t;   // satır sonu tirelemesi
+    else p += ' ' + t;
+  });
+  if (p) paras.push(p);
+  return paras;
+}
+async function readPdf(buf, onProgress) {
+  const pdfjs = await loadPdfJs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise;
+  const all = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    if (onProgress) onProgress(n, doc.numPages);
+    const page = await doc.getPage(n);
+    const tc = await page.getTextContent();
+    const paras = pdfPageParagraphs(tc.items);
+    if (!paras.length) continue;
+    // Sayfa sonunda yarım kalan paragrafı sonraki sayfanın ilk paragrafıyla birleştir.
+    const last = all[all.length - 1];
+    if (last && !/[.!?…:"”»)]$/.test(last) && /^\p{Ll}/u.test(paras[0])) {
+      all[all.length - 1] = /[\p{L}]-$/u.test(last) ? last.slice(0, -1) + paras.shift() : last + ' ' + paras.shift();
+    }
+    all.push(...paras);
+  }
+  try { doc.destroy(); } catch (_) {}
+  const text = tidyText(all.join('\n'));
+  if (!text) throw new Error('Bu PDF\'te seçilebilir metin yok; taranmış bir görüntü olabilir.');
+  return text;
+}
+
+async function readAnyFile(file, opts) {
+  const ext = ((file.name.match(FILE_EXT_RE) || [])[1] || '').toLowerCase();
+  const buf = await file.arrayBuffer();
+  switch (ext) {
+    case 'pdf': return readPdf(buf, opts.onProgress);
+    case 'docx': case 'docm': case 'dotx': return readDocx(buf, opts);
+    case 'odt': case 'ott': return readOdt(buf, opts);
+    case 'epub': return readEpub(buf);
+    case 'rtf': return rtfToText(decodeText(buf).startsWith('{\\rtf') ? new TextDecoder('latin1').decode(buf) : decodeText(buf));
+    case 'html': case 'htm': case 'xhtml': return htmlToText(decodeText(buf));
+    case 'md': case 'markdown': return markdownToText(decodeText(buf));
+    case 'srt': case 'vtt': return subtitleToText(decodeText(buf));
+    case 'doc': throw new Error('Eski Word biçimi (.doc) desteklenmiyor. Dosyayı Word\'de açıp .docx olarak kaydet.');
+    case 'pages': case 'xlsx': case 'xls': case 'pptx': case 'ppt': case 'zip':
+      throw new Error(`.${ext} dosyaları desteklenmiyor.`);
+    default: {
+      const head = new Uint8Array(buf.slice(0, 5));
+      if (head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46) return readPdf(buf, opts.onProgress); // %PDF
+      if (head[0] === 0x50 && head[1] === 0x4b) throw new Error('Bu dosya türü tanınmadı.');
+      const t = decodeText(buf);
+      if (/\u0000/.test(t.slice(0, 2000))) throw new Error('Bu dosya bir metin dosyasına benzemiyor.');
+      if (t.startsWith('{\\rtf')) return rtfToText(new TextDecoder('latin1').decode(buf));
+      return tidyText(t);
+    }
+  }
+}
+// ===== END_FILES =====
 
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
   const editor = $('editor'), readerView = $('readerView'), toggleBtn = $('toggleBtn');
-  const statusEl = $('saveStatus'), positionEl = $('position'), currentSentenceEl = $('currentSentence');
-  const voiceSelect = $('voiceSelect'), rate = $('rate'), pitch = $('pitch');
-  const sentPause = $('sentPause'), paraPause = $('paraPause');
-  const optRoman = $('optRoman'), optAbbr = $('optAbbr'), optLong = $('optLong'), longMax = $('longMax');
-  const themeSelect = $('themeSelect'), bgColor = $('bgColor'), textColor = $('textColor');
-  const fontFamily = $('fontFamily'), fontSize = $('fontSize'), lineHeight = $('lineHeight');
-  const markBtn = $('markBtn'), viewBtn = $('viewBtn'), dictText = $('dictText');
+  const statusEl = $('saveStatus'), undoBtn = $('undoBtn'), positionEl = $('position'), docNameEl = $('docName');
+  const currentSentenceEl = $('currentSentence');
+  const voiceSelect = $('voiceSelect'), voiceBadge = $('voiceBadge'), voiceNote = $('voiceNote');
+  const rate = $('rate'), pitch = $('pitch'), sentPause = $('sentPause'), paraPause = $('paraPause');
+  const optRoman = $('optRoman'), optAbbr = $('optAbbr'), optLong = $('optLong'), longMax = $('longMax'), optFootnotes = $('optFootnotes');
+  const bgColor = $('bgColor'), textColor = $('textColor'), accentColor = $('accentColor'), wordColor = $('wordColor');
+  const fontFamily = $('fontFamily'), fontSize = $('fontSize'), lineHeight = $('lineHeight'), fontWeight = $('fontWeight');
+  const letterSpacing = $('letterSpacing'), wordSpacing = $('wordSpacing'), measure = $('measure'), textAlign = $('textAlign');
+  const markBtn = $('markBtn'), viewBtn = $('viewBtn'), dictText = $('dictText'), copyBtn = $('copySentenceBtn');
   const marksList = $('marksList'), marksEmpty = $('marksEmpty'), marksCount = $('marksCount');
+  const fileInput = $('fileInput'), dropZone = $('dropZone');
 
   const synth = window.speechSynthesis || null;
   const segmenter = (typeof Intl !== 'undefined' && Intl.Segmenter)
@@ -602,56 +1511,168 @@ function wordRangeAt(S, off) {
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch (_) { return false; } }
   };
 
-  const DESKTOP_STATUS = 'Çift tık: oradan oku · Boşluk: oynat/duraklat · ◀/▶: cümle · M: işaretle · R: yinele · Esc: düzenle';
+  const DESKTOP_STATUS = 'Boşluk: oku/duraklat · A: baştan · ←/→: cümle · R: yinele · M: işaretle · C: kopyala · V: yapıştır · E: temizle · Esc: görünüm · F1: yardım';
   const MOBILE_STATUS = 'Bir cümleye çift dokun: oradan okur · ★ ile işaretle · ■ ile düzenlemeye dön';
   const defaultStatus = () => (document.body.classList.contains('mobile-layout') ? MOBILE_STATUS : DESKTOP_STATUS);
 
-  const THEMES = {
-    dark: { bg:'#1b232e', text:'#e5e7eb', panel:'#222c39', line:'#39424f', muted:'#aab4c2', btnBg:'#2b3746', btnBorder:'#4a5869', btnHover:'#39495d', primaryBg:'#345477', primaryBorder:'#557ba5', accent:'#8ab4f8', underline:'#60a5fa', sentBg:'rgba(96,165,250,.10)', wordBg:'#f59e0b', wordText:'#111827', markBg:'rgba(250,204,21,.22)', long:'#f87171' },
-    charcoal: { bg:'#202124', text:'#e8eaed', panel:'#292a2d', line:'#45474b', muted:'#b0b4ba', btnBg:'#303134', btnBorder:'#5f6368', btnHover:'#3c4043', primaryBg:'#394f6e', primaryBorder:'#6b8bb8', accent:'#8ab4f8', underline:'#8ab4f8', sentBg:'rgba(138,180,248,.10)', wordBg:'#fde047', wordText:'#111827', markBg:'rgba(250,204,21,.20)', long:'#f28b82' },
-    sepia: { bg:'#f1e7d3', text:'#40372b', panel:'#e6dac4', line:'#c9bba3', muted:'#6b5d48', btnBg:'#f6eedd', btnBorder:'#bfae90', btnHover:'#ebdfc6', primaryBg:'#e2c79a', primaryBorder:'#b08a4f', accent:'#b45309', underline:'#b45309', sentBg:'rgba(180,83,9,.08)', wordBg:'#d97706', wordText:'#fffbeb', markBg:'rgba(234,179,8,.28)', long:'#b91c1c' },
-    light: { bg:'#f7f4ed', text:'#343434', panel:'#ebe7df', line:'#d4cec3', muted:'#655e53', btnBg:'#f7f4ed', btnBorder:'#c9c2b6', btnHover:'#e4dfd5', primaryBg:'#dbe6f7', primaryBorder:'#7ea0d6', accent:'#2563eb', underline:'#2563eb', sentBg:'rgba(37,99,235,.07)', wordBg:'#facc15', wordText:'#1e293b', markBg:'rgba(234,179,8,.25)', long:'#dc2626' },
-    sage: { bg:'#202b28', text:'#e0e9e2', panel:'#293833', line:'#43564d', muted:'#a9bcb1', btnBg:'#2f413b', btnBorder:'#4e665b', btnHover:'#3a5048', primaryBg:'#2f5a4b', primaryBorder:'#4f8a73', accent:'#34d399', underline:'#34d399', sentBg:'rgba(52,211,153,.10)', wordBg:'#a7f3d0', wordText:'#064e3b', markBg:'rgba(250,204,21,.20)', long:'#fca5a5' }
-  };
+  // ---------- Temalar ----------
+  // Her tema dört temel renkten türetilir: arka plan, yazı, vurgu, okunan kelime.
+  const THEMES = [
+    { id: 'dark',      name: 'Gece laciverti', bg: '#1b232e', text: '#e5e7eb', accent: '#8ab4f8', word: '#f59e0b' },
+    { id: 'charcoal',  name: 'Antrasit',       bg: '#202124', text: '#e8eaed', accent: '#8ab4f8', word: '#fde047' },
+    { id: 'black',     name: 'Tam siyah',      bg: '#000000', text: '#d6d6d6', accent: '#60a5fa', word: '#facc15' },
+    { id: 'slate',     name: 'Kurşun',         bg: '#262b33', text: '#d8dee9', accent: '#93c5fd', word: '#fbbf24' },
+    { id: 'nordic',    name: 'Kuzey',          bg: '#2e3440', text: '#e5e9f0', accent: '#88c0d0', word: '#ebcb8b' },
+    { id: 'ocean',     name: 'Derin okyanus',  bg: '#0f2230', text: '#d8e6ee', accent: '#4fc3f7', word: '#ffd54f' },
+    { id: 'sage',      name: 'Yumuşak yeşil',  bg: '#202b28', text: '#e0e9e2', accent: '#34d399', word: '#a7f3d0' },
+    { id: 'forest',    name: 'Orman',          bg: '#16231b', text: '#dfe9dc', accent: '#86efac', word: '#fcd34d' },
+    { id: 'plum',      name: 'Mor gece',       bg: '#282a36', text: '#f8f8f2', accent: '#bd93f9', word: '#ffb86c' },
+    { id: 'earth',     name: 'Toprak',         bg: '#282828', text: '#ebdbb2', accent: '#fabd2f', word: '#fe8019' },
+    { id: 'coffee',    name: 'Kahve',          bg: '#2b211b', text: '#eadccf', accent: '#d4a373', word: '#e9c46a' },
+    { id: 'bordeaux',  name: 'Bordo',          bg: '#2a1a1f', text: '#f0e3e6', accent: '#f48fb1', word: '#ffcc80' },
+    { id: 'solarDark', name: 'Güneş (koyu)',   bg: '#002b36', text: '#a7b6b8', accent: '#3b9ede', word: '#d4a017' },
+    { id: 'hcDark',    name: 'Yüksek karşıtlık (koyu)', bg: '#000000', text: '#ffffff', accent: '#ffff00', word: '#00ffff', hc: true },
+    { id: 'light',     name: 'Açık krem',      bg: '#f7f4ed', text: '#343434', accent: '#2563eb', word: '#facc15' },
+    { id: 'paper',     name: 'Kâğıt beyazı',   bg: '#ffffff', text: '#1f2328', accent: '#0969da', word: '#ffd33d' },
+    { id: 'sepia',     name: 'Sepya',          bg: '#f1e7d3', text: '#40372b', accent: '#b45309', word: '#d97706' },
+    { id: 'sand',      name: 'Kum',            bg: '#ece3d0', text: '#3b3326', accent: '#8a5a14', word: '#e0a106' },
+    { id: 'solarLight',name: 'Güneş (açık)',   bg: '#fdf6e3', text: '#4f5f66', accent: '#268bd2', word: '#e9b949' },
+    { id: 'grayPaper', name: 'Gri kâğıt',      bg: '#e9eaec', text: '#222428', accent: '#3b5bdb', word: '#fcc419' },
+    { id: 'mint',      name: 'Nane',           bg: '#eef6f1', text: '#1f3a2f', accent: '#0f766e', word: '#fbbf24' },
+    { id: 'sky',       name: 'Gökyüzü',        bg: '#eef5fb', text: '#1e2b38', accent: '#1d4ed8', word: '#fbbf24' },
+    { id: 'lavender',  name: 'Lavanta',        bg: '#f3f0fa', text: '#2e2a3d', accent: '#6d28d9', word: '#f59e0b' },
+    { id: 'rose',      name: 'Gül kurusu',     bg: '#f8eeee', text: '#3d2a2e', accent: '#be185d', word: '#f59e0b' },
+    { id: 'hcLight',   name: 'Yüksek karşıtlık (açık)', bg: '#ffffff', text: '#000000', accent: '#0000cc', word: '#ffff00', hc: true }
+  ];
+  const themeById = id => THEMES.find(t => t.id === id);
   const VAR_MAP = { bg:'--bg', text:'--text', panel:'--panel', line:'--line', muted:'--muted', btnBg:'--btn-bg', btnBorder:'--btn-border', btnHover:'--btn-hover', primaryBg:'--primary-bg', primaryBorder:'--primary-border', accent:'--accent', underline:'--underline', sentBg:'--sent-bg', wordBg:'--word-bg', wordText:'--word-text', markBg:'--mark-bg', long:'--long' };
-  const DEFAULT_LOOK = { theme:'dark', bg:'', text:'', font:'Arial, Helvetica, sans-serif', size:'18', lh:'1.65' };
 
-  // ---------- Ayarlar (v2'den otomatik taşıma dahil) ----------
-  const storedSettings = LS.get('mo3Settings', null);
-  const settings = Object.assign({
-    voice:'', rate:'1', pitch:'1', sentPause:'150', paraPause:'600',
-    roman:true, abbr:true, longOn:true, longMax:'40', layout:'desktop', iconsOnly:false
-  }, DEFAULT_LOOK, (() => { try { return JSON.parse(storedSettings) || {}; } catch (_) { return {}; } })());
-  if (!storedSettings) {
-    settings.rate = LS.get('darkReaderRate', settings.rate);
-    settings.pitch = LS.get('darkReaderPitch', settings.pitch);
-    const v = LS.get('darkReaderVoice', '');
-    if (v && v !== 'google_online') settings.voice = v;
+  // ---------- Yazı tipleri ----------
+  // Sistem yazı tipleri yalnızca bilgisayarda kuruluysa listelenir.
+  const SYSTEM_FONTS = {
+    'Tırnaklı (serif)': ['Georgia', 'Times New Roman', 'Cambria', 'Constantia', 'Sitka Text', 'Palatino Linotype', 'Book Antiqua', 'Garamond', 'Baskerville', 'Charter', 'Iowan Old Style', 'Hoefler Text'],
+    'Tırnaksız (sans-serif)': ['Arial', 'Segoe UI', 'Aptos', 'Calibri', 'Candara', 'Corbel', 'Tahoma', 'Verdana', 'Trebuchet MS', 'Century Gothic', 'Bahnschrift', 'Gill Sans', 'Helvetica Neue', 'Avenir Next'],
+    'Eşit aralıklı': ['Consolas', 'Cascadia Mono', 'Courier New', 'Lucida Console', 'Menlo']
+  };
+  const FALLBACK = { 'Tırnaklı (serif)': 'serif', 'Tırnaksız (sans-serif)': 'sans-serif', 'Eşit aralıklı': 'monospace' };
+  // İnternetten (Google Fonts) yüklenen okuma yazı tipleri: [ad, istek, yedek]
+  const WEB_FONTS = [
+    ['Literata', 'Literata:wght@400;500;600;700', 'serif'],
+    ['Merriweather', 'Merriweather:wght@400;700', 'serif'],
+    ['Lora', 'Lora:wght@400;500;600;700', 'serif'],
+    ['Source Serif 4', 'Source+Serif+4:wght@400;600;700', 'serif'],
+    ['Noto Serif', 'Noto+Serif:wght@400;600;700', 'serif'],
+    ['PT Serif', 'PT+Serif:wght@400;700', 'serif'],
+    ['IBM Plex Serif', 'IBM+Plex+Serif:wght@400;600;700', 'serif'],
+    ['EB Garamond', 'EB+Garamond:wght@400;600;700', 'serif'],
+    ['Crimson Pro', 'Crimson+Pro:wght@400;600;700', 'serif'],
+    ['Libre Baskerville', 'Libre+Baskerville:wght@400;700', 'serif'],
+    ['Atkinson Hyperlegible', 'Atkinson+Hyperlegible:wght@400;700', 'sans-serif'],
+    ['Lexend', 'Lexend:wght@400;500;600;700', 'sans-serif'],
+    ['Inter', 'Inter:wght@400;500;600;700', 'sans-serif'],
+    ['Noto Sans', 'Noto+Sans:wght@400;600;700', 'sans-serif'],
+    ['Open Sans', 'Open+Sans:wght@400;600;700', 'sans-serif'],
+    ['Roboto', 'Roboto:wght@400;500;700', 'sans-serif'],
+    ['Fira Sans', 'Fira+Sans:wght@400;500;600;700', 'sans-serif'],
+    ['JetBrains Mono', 'JetBrains+Mono:wght@400;600;700', 'monospace']
+  ];
+  const fontStack = (name, fb) => `'${name}', ${fb}`;
+  function fontInstalled(name) {
     try {
-      const a = JSON.parse(LS.get('darkReaderAppearance', 'null'));
-      if (a) {
-        if (a.font) settings.font = a.font;
-        if (a.size) settings.size = a.size;
-        if (a.line) settings.lh = a.line;
-        if (a.theme && THEMES[a.theme]) settings.theme = a.theme;
+      const c = document.createElement('canvas').getContext('2d');
+      const s = 'mmmmmmmmmmlliWWğüşİıöç0123456789';
+      for (const base of ['monospace', 'serif', 'sans-serif']) {
+        c.font = `72px ${base}`; const w0 = c.measureText(s).width;
+        c.font = `72px '${name}', ${base}`; const w1 = c.measureText(s).width;
+        if (w0 !== w1) return true;
       }
     } catch (_) {}
+    return false;
   }
-  function saveSettings() { LS.set('mo3Settings', JSON.stringify(settings)); }
+  const loadedWebFonts = new Set();
+  function ensureWebFont(stack) {
+    const wf = WEB_FONTS.find(f => fontStack(f[0], f[2]) === stack);
+    if (!wf || loadedWebFonts.has(wf[0])) return;
+    loadedWebFonts.add(wf[0]);
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = `https://fonts.googleapis.com/css2?family=${wf[1]}&display=swap`;
+    document.head.appendChild(l);
+  }
+  function buildFontList() {
+    fontFamily.textContent = '';
+    for (const [group, list] of Object.entries(SYSTEM_FONTS)) {
+      const og = document.createElement('optgroup');
+      og.label = `Bilgisayarındaki — ${group}`;
+      for (const f of list) {
+        if (!fontInstalled(f)) continue;
+        const o = document.createElement('option');
+        o.value = fontStack(f, FALLBACK[group]); o.textContent = f;
+        og.appendChild(o);
+      }
+      if (og.children.length) fontFamily.appendChild(og);
+    }
+    const og = document.createElement('optgroup');
+    og.label = 'İnternetten (Google Fonts)';
+    for (const [name, , fb] of WEB_FONTS) {
+      const o = document.createElement('option');
+      o.value = fontStack(name, fb); o.textContent = name + ' ☁';
+      og.appendChild(o);
+    }
+    fontFamily.appendChild(og);
+    if (!fontFamily.options.length || ![...fontFamily.options].some(o => o.value === DEFAULT_LOOK.font)) {
+      const o = document.createElement('option');
+      o.value = DEFAULT_LOOK.font; o.textContent = 'Arial';
+      fontFamily.insertBefore(o, fontFamily.firstChild);
+    }
+  }
+
+  const DEFAULT_LOOK = {
+    theme: 'dark', custom: null, font: "'Arial', sans-serif", size: '18', lh: '1.65', weight: '400',
+    ls: '0', ws: '0', measure: '100%', align: 'left'
+  };
+
+  // ---------- Ayarlar (v3 ve v2'den otomatik taşıma dahil) ----------
+  const parse = (s, d) => { try { return JSON.parse(s) || d; } catch (_) { return d; } };
+  const stored4 = LS.get('mo4Settings', null);
+  const settings = Object.assign({
+    voice: '', rate: '1', pitch: '1', sentPause: '150', paraPause: '600',
+    roman: true, abbr: true, longOn: true, longMax: '40', footnotes: false, layout: 'desktop', iconsOnly: false
+  }, DEFAULT_LOOK, stored4 ? parse(stored4, {}) : {});
+  if (!stored4) {
+    const v3 = parse(LS.get('mo3Settings', 'null'), null);
+    if (v3) {
+      for (const k of ['voice', 'rate', 'pitch', 'sentPause', 'paraPause', 'roman', 'abbr', 'longOn', 'longMax', 'layout', 'iconsOnly', 'size', 'lh']) {
+        if (v3[k] !== undefined) settings[k] = v3[k];
+      }
+      if (v3.theme && themeById(v3.theme)) settings.theme = v3.theme;
+      if (v3.theme === 'custom' && v3.bg) {
+        const base = isLightColor(v3.bg) ? themeById('light') : themeById('dark');
+        settings.theme = 'custom';
+        settings.custom = { bg: v3.bg, text: v3.text || base.text, accent: base.accent, word: base.word };
+      }
+      if (v3.font) { const first = v3.font.split(',')[0].replace(/'/g, '').trim(); settings.font = `'${first}', ${/serif/i.test(v3.font) && !/sans/i.test(v3.font) ? 'serif' : /mono/i.test(v3.font) ? 'monospace' : 'sans-serif'}`; }
+    } else {
+      settings.rate = LS.get('darkReaderRate', settings.rate);
+      settings.pitch = LS.get('darkReaderPitch', settings.pitch);
+    }
+  }
+  function saveSettings() { LS.set('mo4Settings', JSON.stringify(settings)); }
 
   // ---------- Durum ----------
   let sentences = [], spans = [], currentIndex = 0, finished = false, readerDirty = true;
   let readAll = false, gapTimer = null, gapNext = -1, pausedGapNext = -1;
-  let dictRules = [], marks = new Set(), voices = [], wakeLock = null, lastVoiceValue = '';
+  let dictRules = [], marks = new Set(), voices = [], wakeLock = null;
   let saveTimer = null, liveTimer = null, statusTimer = null;
 
   const fmt = (n, d = 1) => Number(n).toLocaleString('tr-TR', { minimumFractionDigits: d, maximumFractionDigits: d });
   const isReading = () => document.body.classList.contains('reading-mode');
 
-  function setStatus(msg, ms = 3500) {
+  function setStatus(msg, ms = 3500, withUndo = false) {
     statusEl.textContent = msg;
+    undoBtn.hidden = !withUndo;
     clearTimeout(statusTimer);
-    if (ms) statusTimer = setTimeout(() => { statusEl.textContent = defaultStatus(); }, ms);
+    if (ms) statusTimer = setTimeout(() => { statusEl.textContent = defaultStatus(); undoBtn.hidden = true; }, ms);
   }
 
   async function copyText(text) {
@@ -664,6 +1685,7 @@ function wordRangeAt(S, off) {
     h.remove();
     return ok;
   }
+  function flash(btn) { btn.classList.add('flash'); setTimeout(() => btn.classList.remove('flash'), 350); }
 
   // ---------- Ekran kilidi (uzun dinlemede ekran kapanmasın) ----------
   async function acquireWakeLock() {
@@ -685,14 +1707,13 @@ function wordRangeAt(S, off) {
   // ---------- Konuşma motoru ----------
   // Duraklatma, motoru durdurup son okunan kelimeden yeniden başlatarak yapılır.
   // Bu yöntem, pause()/resume() desteği zayıf olan seslerde de güvenilir çalışır.
-  const engine = { token: 0, chunks: [], k: 0, wordOff: 0, handlers: {}, audio: null, utterance: null, playing: false, paused: false, saved: null };
+  const engine = { token: 0, chunks: [], k: 0, wordOff: 0, handlers: {}, utterance: null, playing: false, paused: false, saved: null };
 
   function cancelOutput() {
     if (synth) {
       try { synth.resume(); } catch (_) {}   // Chrome: duraklatılmış motor iptalden sonra sessiz kalmasın
       try { synth.cancel(); } catch (_) {}
     }
-    if (engine.audio) { try { engine.audio.pause(); } catch (_) {} engine.audio = null; }
     engine.utterance = null;
   }
   function engStop() { engine.token++; cancelOutput(); engine.playing = false; engine.paused = false; }
@@ -720,7 +1741,7 @@ function wordRangeAt(S, off) {
     engPlay(rest, s.handlers);
   }
   function voiceChoice() {
-    return voices.find(v => v.voiceURI === voiceSelect.value) || pickDefaultVoice();
+    return voices.find(v => v.voiceURI === voiceSelect.value) || sortVoices(voices)[0] || null;
   }
   function engSpeak(t, k) {
     if (t !== engine.token) return;
@@ -740,12 +1761,11 @@ function wordRangeAt(S, off) {
       if (H.onError) H.onError(msg);
     };
     if (!out.trim()) { next(); return; }
-    const choice = voiceChoice();
-
     if (!synth) { fail('Bu tarayıcı sesli okumayı desteklemiyor.'); return; }
 
+    const choice = voiceChoice();
     const u = new SpeechSynthesisUtterance(out);
-    if (choice && typeof choice === 'object') { u.voice = choice; u.lang = choice.lang; } else { u.lang = 'tr-TR'; }
+    if (choice) { u.voice = choice; u.lang = choice.lang; } else { u.lang = 'tr-TR'; }
     u.rate = Number(settings.rate);
     u.pitch = Number(settings.pitch);
     u.onboundary = (e) => {
@@ -764,7 +1784,7 @@ function wordRangeAt(S, off) {
     synth.speak(u);
   }
 
-  const maxChunk = () => 200;
+  const MAX_CHUNK = 200;
   const isPlaying = () => (engine.playing && !engine.paused) || !!gapTimer;
   const isPaused = () => engine.paused || pausedGapNext >= 0;
   const isActive = () => isPlaying() || isPaused();
@@ -786,7 +1806,7 @@ function wordRangeAt(S, off) {
     if (!sentences.length) {
       const e = document.createElement('span');
       e.className = 'empty-hint';
-      e.textContent = 'Okunacak metin yok. Esc ile düzenleme moduna dönüp metni yazabilir veya yapıştırabilirsin.';
+      e.textContent = 'Okunacak metin yok. V ile panodaki metni yapıştırabilir, bir dosyayı buraya sürükleyip bırakabilir ya da Esc ile düzenleme görünümüne dönüp yazabilirsin.';
       readerView.appendChild(e);
       return;
     }
@@ -812,6 +1832,7 @@ function wordRangeAt(S, off) {
 
   function enterReading() {
     if (readerDirty) renderReader();
+    if (document.activeElement === editor) editor.blur();
     document.body.classList.add('reading-mode');
     updateControls();
   }
@@ -865,7 +1886,8 @@ function wordRangeAt(S, off) {
     toggleBtn.querySelector('.ic').textContent = ic;
     toggleBtn.querySelector('.lbl').textContent = lbl;
     toggleBtn.setAttribute('aria-label', lbl);
-    viewBtn.textContent = isReading() ? '✎ Düzenle' : '👁 Okuma görünümü';
+    viewBtn.querySelector('.ic').textContent = isReading() ? '✎' : '👁';
+    viewBtn.querySelector('.lbl').textContent = isReading() ? 'Düzenle' : 'Okuma görünümü';
   }
 
   function updateInfo() {
@@ -874,7 +1896,7 @@ function wordRangeAt(S, off) {
     let total = 0, remain = 0;
     sentences.forEach((x, i) => { total += x.words; if (i >= currentIndex) remain += x.words; });
     const mins = remain / (150 * (Number(settings.rate) || 1));
-    const remainTxt = !n ? '–' : mins < 1 ? '<1 dk' : `≈${Math.round(mins)} dk`;
+    const remainTxt = !n ? '–' : mins < 1 ? '<1 dk' : mins < 90 ? `≈${Math.round(mins)} dk` : `≈${fmt(mins / 60, 1)} sa`;
     positionEl.textContent = `Cümle: ${n ? currentIndex + 1 : 0} / ${n} · ${total.toLocaleString('tr-TR')} kelime · Kalan ${remainTxt}`;
     markBtn.classList.toggle('on', !!(s && marks.has(s.text)));
     updateControls();
@@ -884,7 +1906,7 @@ function wordRangeAt(S, off) {
   function scrollEditorTo(pos) {
     const cs = getComputedStyle(editor);
     const m = document.createElement('div');
-    ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'wordSpacing',
+    ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'wordSpacing', 'textAlign',
      'paddingTop', 'paddingLeft', 'paddingRight'].forEach(p => { m.style[p] = cs[p]; });
     Object.assign(m.style, {
       position: 'absolute', visibility: 'hidden', left: '-9999px', top: '0', border: '0',
@@ -892,7 +1914,7 @@ function wordRangeAt(S, off) {
     });
     m.textContent = editor.value.slice(0, pos);
     const marker = document.createElement('span');
-    marker.textContent = '\u200b';
+    marker.textContent = '​';
     m.appendChild(marker);
     document.body.appendChild(m);
     const y = marker.offsetTop;
@@ -913,13 +1935,13 @@ function wordRangeAt(S, off) {
   function readSentence(i, from = 0) {
     clearGap();
     pausedGapNext = -1;
-    if (!sentences.length) { setStatus('Önce okunacak bir metin yaz veya yapıştır.', 4000); return; }
+    if (!sentences.length) { setStatus('Önce okunacak bir metin yapıştır (V) ya da bir dosya sürükleyip bırak.', 4000); return; }
     enterReading();
     setCurrent(i, true);
     finished = false;
     const idx = currentIndex, S = sentences[idx].text;
     acquireWakeLock();
-    engPlay(chunkText(S, from, maxChunk()), {
+    engPlay(chunkText(S, from, MAX_CHUNK), {
       onWord: off => { if (idx === currentIndex) highlightWord(off); },
       onDone: () => { if (idx === currentIndex) clearWordHighlight(); afterSentence(idx); },
       onError: msg => { readAll = false; clearWordHighlight(); releaseWakeLock(); setStatus(msg, 7000); updateControls(); }
@@ -1003,7 +2025,7 @@ function wordRangeAt(S, off) {
     if (!t) { setStatus('Önce okunacak bölümü seç, ardından “Seçili metni oku”ya bas.', 5000); return; }
     stopAll(false);
     acquireWakeLock();
-    engPlay(chunkText(t, 0, maxChunk()), {
+    engPlay(chunkText(t, 0, MAX_CHUNK), {
       onDone: () => { releaseWakeLock(); updateControls(); },
       onError: msg => { releaseWakeLock(); setStatus(msg, 7000); updateControls(); }
     });
@@ -1017,6 +2039,130 @@ function wordRangeAt(S, off) {
       if (engine.playing && !engine.paused) { engPause(); engResume(); }   // son kelimeden yeni ayarla devam
     }, 150);
   }
+
+  // ---------- Metni değiştirme (yapıştır, dosya, temizle) ve geri alma ----------
+  function saveTextNow() {
+    clearTimeout(saveTimer);
+    return LS.set('darkReaderText', editor.value);
+  }
+  function rememberUndo() {
+    if (!editor.value) return false;
+    LS.set('mo4Undo', JSON.stringify({ text: editor.value, index: currentIndex, doc: LS.get('mo4DocName', '') }));
+    return true;
+  }
+  function setDocName(name) {
+    LS.set('mo4DocName', name || '');
+    docNameEl.textContent = name ? `📄 ${name}` : '';
+    docNameEl.title = name || '';
+  }
+  function replaceText(text, { docName = '', message = '', index = 0, read = true } = {}) {
+    const hadText = rememberUndo();
+    stopAll(false);
+    editor.value = text;
+    currentIndex = index; finished = false;
+    rebuild();
+    saveTextNow();
+    LS.set('darkReaderIndex', String(currentIndex));
+    setDocName(docName);
+    renderMarks();
+    if (read && text) { enterReading(); setCurrent(currentIndex, true); readerView.scrollTop = currentIndex ? readerView.scrollTop : 0; }
+    else { document.body.classList.remove('reading-mode'); updateControls(); }
+    if (message) setStatus(message, hadText ? 12000 : 5000, hadText);
+  }
+  function undoReplace() {
+    const u = parse(LS.get('mo4Undo', 'null'), null);
+    if (!u) { setStatus('Geri alınacak bir şey yok.', 2500); return; }
+    if (editor.value) LS.set('mo4Undo', JSON.stringify({ text: editor.value, index: currentIndex, doc: LS.get('mo4DocName', '') }));
+    else LS.set('mo4Undo', 'null');
+    stopAll(false);
+    editor.value = u.text;
+    currentIndex = Math.min(u.index || 0, Number.MAX_SAFE_INTEGER); finished = false;
+    rebuild(); saveTextNow();
+    setDocName(u.doc || '');
+    renderMarks();
+    enterReading(); setCurrent(currentIndex, true);
+    setStatus('Önceki metin geri getirildi.', 6000, !!editor.value && u.text !== editor.value);
+  }
+  undoBtn.addEventListener('click', undoReplace);
+
+  function clearText() {
+    if (!editor.value) { setStatus('Metin alanı zaten boş.', 2000); return; }
+    replaceText('', { message: 'Metin temizlendi.', read: false });
+    editor.focus();
+  }
+
+  async function pasteFromClipboard() {
+    let t = '';
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) throw new Error('no-api');
+      t = await navigator.clipboard.readText();
+    } catch (_) {
+      setStatus('Tarayıcı panoya erişim izni vermedi. Metin alanına tıklayıp Ctrl+V ile yapıştırabilirsin.', 7000);
+      return;
+    }
+    t = tidyText(t);
+    if (!t) { setStatus('Panoda yapıştırılacak metin yok.', 3000); return; }
+    replaceText(t, { message: `Panodaki metin yüklendi: ${countWords(t).toLocaleString('tr-TR')} kelime.` });
+  }
+
+  // ---------- Dosya açma ve sürükle-bırak ----------
+  let loadingFile = false;
+  async function loadFiles(files) {
+    files = [...files].filter(f => f && f.size !== undefined);
+    if (!files.length || loadingFile) return;
+    loadingFile = true;
+    const texts = [], names = [], errors = [];
+    try {
+      for (const f of files) {
+        setStatus(`“${f.name}” okunuyor…`, 0);
+        try {
+          const t = await readAnyFile(f, {
+            footnotes: !!settings.footnotes,
+            onProgress: (n, total) => setStatus(`“${f.name}” okunuyor: sayfa ${n} / ${total}`, 0)
+          });
+          if (t) { texts.push(t); names.push(f.name); } else errors.push(`“${f.name}” boş görünüyor.`);
+        } catch (e) {
+          errors.push(`“${f.name}”: ${e && e.message ? e.message : 'okunamadı.'}`);
+        }
+      }
+    } finally { loadingFile = false; }
+    if (!texts.length) { setStatus(errors.join(' ') || 'Dosya okunamadı.', 9000); return; }
+    const text = texts.join('\n\n');
+    const label = names.length === 1 ? names[0] : `${names[0]} ve ${names.length - 1} dosya daha`;
+    let msg = `“${label}” yüklendi: ${countWords(text).toLocaleString('tr-TR')} kelime.`;
+    if (errors.length) msg += ' ' + errors.join(' ');
+    replaceText(text, { docName: label, message: msg });
+  }
+  $('openBtn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { loadFiles(fileInput.files); fileInput.value = ''; });
+
+  let dragDepth = 0;
+  const hasDroppable = e => {
+    const types = e.dataTransfer ? [...e.dataTransfer.types] : [];
+    return types.includes('Files') || types.includes('text/plain');
+  };
+  window.addEventListener('dragenter', e => {
+    if (!hasDroppable(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    if ([...e.dataTransfer.types].includes('Files')) dropZone.hidden = false;
+  });
+  window.addEventListener('dragover', e => {
+    if (!hasDroppable(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropZone.hidden = true; });
+  window.addEventListener('drop', e => {
+    dragDepth = 0; dropZone.hidden = true;
+    if (!e.dataTransfer) return;
+    const files = e.dataTransfer.files;
+    if (files && files.length) { e.preventDefault(); loadFiles(files); return; }
+    // Başka programdan sürüklenen düz metin: düzenleyicinin içine bırakılırsa tarayıcı kendisi ekler.
+    if (e.target === editor) return;
+    const t = tidyText(e.dataTransfer.getData('text/plain'));
+    if (t) { e.preventDefault(); replaceText(t, { message: `Bırakılan metin yüklendi: ${countWords(t).toLocaleString('tr-TR')} kelime.` }); }
+  });
 
   // ---------- İşaretli cümleler ----------
   function saveMarks() { LS.set('mo3Marks', JSON.stringify([...marks])); }
@@ -1054,27 +2200,20 @@ function wordRangeAt(S, off) {
     }
   }
 
-  // ---------- Sesler ----------
-  // Ses önceliği: 1) Edge Ahmet (Natural) 2) Edge Emel (Natural) 3) diğer yapay sinir ağı Türkçe sesler
-  // 4) çevrimiçi/geliştirilmiş Türkçe sesler (Chrome'un Google Türkçe sesi, Apple Premium/Enhanced)
-  // 5) diğer Türkçe sesler 6) diğer diller (önce doğal olanlar).
-  function voiceRank(v) {
-    const tr = /^tr([-_]|$)/i.test(v.lang), n = v.name || '';
-    const neural = /natural|neural/i.test(n), online = /online|google|premium|enhanced|wavenet/i.test(n);
-    if (tr && /ahmet/i.test(n) && (neural || online)) return 0;
-    if (tr && /emel/i.test(n) && (neural || online)) return 1;
-    if (tr && neural) return 2;
-    if (tr && online) return 3;
-    if (tr) return 4;
-    return neural ? 5 : online ? 6 : 7;
+  async function copyCurrent() {
+    const s = sentences[currentIndex];
+    if (!s) return;
+    const ok = await copyText(s.text);
+    copyBtn.textContent = ok ? '✓ Kopyalandı' : 'Kopyalanamadı';
+    flash(copyBtn);
+    setTimeout(() => { copyBtn.textContent = '⧉ Kopyala'; }, 1400);
   }
-  const sortVoices = list => [...list].sort((a, b) =>
-    voiceRank(a) - voiceRank(b) || a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
-  function pickDefaultVoice() { return sortVoices(voices)[0] || null; }
+
+  // ---------- Sesler ----------
   function loadVoices() {
     voices = synth ? synth.getVoices() : [];
     const cur = voiceSelect.value;
-    const prev = (cur && cur !== 'Sesler yükleniyor…' && cur !== '__none') ? cur : settings.voice;
+    const prev = (cur && cur !== '__none' && voices.some(v => v.voiceURI === cur)) ? cur : settings.voice;
     voiceSelect.textContent = '';
     const sorted = sortVoices(voices);
     if (!sorted.length) {
@@ -1082,45 +2221,153 @@ function wordRangeAt(S, off) {
       o.value = '__none'; o.textContent = synth ? 'Sesler yükleniyor…' : 'Sistem sesi bulunamadı';
       voiceSelect.appendChild(o);
     }
+    let og = null, gname = '';
     sorted.forEach(v => {
+      const g = voiceGroup(v);
+      if (g !== gname) { og = document.createElement('optgroup'); og.label = g; voiceSelect.appendChild(og); gname = g; }
       const o = document.createElement('option');
       o.value = v.voiceURI;
-      o.textContent = `${v.name} — ${v.lang}${v.default ? ' (varsayılan)' : ''}`;
-      voiceSelect.appendChild(o);
+      o.textContent = `${v.localService ? '💻' : '☁'} ${shortVoiceName(v)}`;
+      o.title = v.name;
+      og.appendChild(o);
     });
-    if (prev && prev !== '__none' && [...voiceSelect.options].some(o => o.value === prev)) voiceSelect.value = prev;
-    else { const d = sorted[0]; voiceSelect.value = d ? d.voiceURI : '__none'; }
-    lastVoiceValue = voiceSelect.value;
+    if (prev && [...voiceSelect.options].some(o => o.value === prev)) voiceSelect.value = prev;
+    else if (sorted[0]) voiceSelect.value = sorted[0].voiceURI;
+    updateVoiceInfo();
+    const hasEdge = sorted.some(v => /online \(natural\)/i.test(v.name));
+    voiceNote.innerHTML = hasEdge
+      ? 'Çok dilli sesler Türkçeyi de okur; metindeki İngilizce bölümleri aynı sesle, doğru telaffuzla seslendirir.'
+      : '💡 En doğal Türkçe sesler (Ahmet, Emel) ve çok dilli sesler (Brian, Andrew, Florian, Emma, Ava) için bu sayfayı <b>Microsoft Edge</b> ile aç.';
+  }
+  function updateVoiceInfo() {
+    const v = voices.find(x => x.voiceURI === voiceSelect.value);
+    if (!v) { voiceBadge.textContent = ''; voiceBadge.className = 'badge'; return; }
+    if (v.localService) {
+      voiceBadge.textContent = '💻 Cihaz sesi: metin bilgisayardan çıkmaz';
+      voiceBadge.className = 'badge';
+    } else {
+      voiceBadge.textContent = '☁ Bulut sesi: okunan cümleler seslendirme için sunucuya gider';
+      voiceBadge.className = 'badge cloud';
+    }
+    fitUI();
   }
 
   // ---------- Görünüm ----------
-  function isLight(hex) {
-    const c = String(hex || '').replace('#', '');
-    if (c.length !== 6) return false;
-    const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
-    return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
+  function currentBase() {
+    if (settings.theme === 'custom' && settings.custom) return settings.custom;
+    return themeById(settings.theme) || THEMES[0];
   }
   function applyAppearance() {
-    const custom = settings.theme === 'custom' || !THEMES[settings.theme];
-    const base = !custom ? THEMES[settings.theme] : (isLight(settings.bg) ? THEMES.light : THEMES.dark);
-    const t = Object.assign({}, base);
-    if (custom) { if (settings.bg) t.bg = settings.bg; if (settings.text) t.text = settings.text; }
+    const base = currentBase();
+    const t = deriveTheme(base);
     const st = document.documentElement.style;
     for (const [k, v] of Object.entries(VAR_MAP)) st.setProperty(v, t[k]);
+    ensureWebFont(settings.font);
     st.setProperty('--font', settings.font);
     st.setProperty('--size', `${settings.size}px`);
     st.setProperty('--lh', settings.lh);
-    st.colorScheme = isLight(t.bg) ? 'light' : 'dark';
-    themeSelect.value = custom ? 'custom' : settings.theme;
-    bgColor.value = t.bg; textColor.value = t.text;
+    st.setProperty('--weight', settings.weight);
+    st.setProperty('--ls', `${settings.ls}em`);
+    st.setProperty('--ws', `${settings.ws}em`);
+    st.setProperty('--measure', settings.measure);
+    st.setProperty('--align', settings.align);
+    document.body.classList.toggle('justify', settings.align === 'justify');
+    st.colorScheme = isLightColor(t.bg) ? 'light' : 'dark';
+    bgColor.value = base.bg; textColor.value = base.text; accentColor.value = base.accent; wordColor.value = base.word;
+    if (![...fontFamily.options].some(o => o.value === settings.font)) {
+      const o = document.createElement('option');
+      o.value = settings.font; o.textContent = settings.font.split(',')[0].replace(/'/g, '');
+      fontFamily.appendChild(o);
+    }
     fontFamily.value = settings.font; fontSize.value = settings.size; lineHeight.value = settings.lh;
+    fontWeight.value = settings.weight; letterSpacing.value = settings.ls; wordSpacing.value = settings.ws;
+    measure.value = settings.measure; textAlign.value = settings.align;
     $('fontSizeValue').textContent = `${settings.size} px`;
     $('lineHeightValue').textContent = fmt(settings.lh, 2);
+    $('letterSpacingValue').textContent = Number(settings.ls) ? fmt(settings.ls, 2) + ' em' : '0';
+    $('wordSpacingValue').textContent = Number(settings.ws) ? fmt(settings.ws, 2) + ' em' : '0';
+    const isWeb = WEB_FONTS.some(f => fontStack(f[0], f[2]) === settings.font);
+    $('fontNote').textContent = isWeb
+      ? '☁ Bu yazı tipi Google Fonts\'tan yüklenir (metnin gönderilmez). İnternet yoksa yedek yazı tipi kullanılır.'
+      : 'Bilgisayarında kurulu yazı tipleri listelenir; ☁ işaretliler internetten yüklenir.';
+    renderSwatches();
+    fitUI();
   }
+  function renderSwatches() {
+    const box = $('themeSwatches');
+    box.textContent = '';
+    const list = THEMES.concat(settings.custom ? [{ id: 'custom', name: 'Özel', ...settings.custom }] : []);
+    for (const th of list) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch' + (settings.theme === th.id ? ' sel' : '');
+      b.style.background = th.bg; b.style.color = th.text; b.style.borderColor = mix(th.bg, th.text, 0.3);
+      b.title = th.name;
+      b.setAttribute('aria-pressed', String(settings.theme === th.id));
+      const name = document.createElement('span'); name.textContent = th.name;
+      const dots = document.createElement('span'); dots.className = 'dots';
+      for (const c of [th.text, th.accent, th.word]) { const i = document.createElement('i'); i.style.background = c; dots.appendChild(i); }
+      b.append(name, dots);
+      b.addEventListener('click', () => { settings.theme = th.id; saveSettings(); applyAppearance(); });
+      box.appendChild(b);
+    }
+  }
+  function onCustomColor() {
+    settings.custom = { bg: bgColor.value, text: textColor.value, accent: accentColor.value, word: wordColor.value };
+    settings.theme = 'custom';
+    saveSettings(); applyAppearance();
+  }
+  [bgColor, textColor, accentColor, wordColor].forEach(el => el.addEventListener('input', onCustomColor));
+
+  // ---------- Ekrana sığdırma ----------
+  // Arayüz ölçeğini (--ui) metin alanına yeterli yer kalacak ve hiçbir düğme taşmayacak şekilde ayarlar.
+  const wrap = $('wrap');
+  let fitting = false, fitQueued = false;
+  function textArea() { return isReading() ? readerView : editor; }
+  function overflowing() {
+    const area = textArea();
+    const minArea = Math.max(70, Math.min(220, window.innerHeight * 0.22));
+    return wrap.scrollHeight > wrap.clientHeight + 1 || area.clientHeight < minArea;
+  }
+  function fitUI() {
+    if (fitting) return;
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => {
+      fitQueued = false; fitting = true;
+      const root = document.documentElement.style;
+      const bodies = document.querySelectorAll('details.panel[open] .panel-body');
+      bodies.forEach(b => { b.style.maxHeight = ''; });
+      let s = window.innerWidth >= 1400 && window.innerHeight >= 900 ? 1.08 : 1;
+      root.setProperty('--ui', String(s));
+      const shrinkPanel = min => {
+        if (!bodies.length) return;
+        let h = Math.min(...[...bodies].map(b => b.clientHeight));
+        while (overflowing() && h > min) { h = Math.max(min, h - 20); bodies.forEach(b => { b.style.maxHeight = h + 'px'; }); }
+      };
+      // 1) Önce açık panel kısılır (panelin içi kendi içinde kayar), düğmeler büyük kalır.
+      shrinkPanel(150);
+      // 2) Yetmezse bütün arayüz orantılı küçülür.
+      while (overflowing() && s > 0.6) { s = Math.round((s - 0.04) * 100) / 100; root.setProperty('--ui', String(s)); }
+      // 3) Çok küçük pencerelerde panel biraz daha kısılır.
+      shrinkPanel(50);
+      fitting = false;
+    });
+  }
+  window.addEventListener('resize', fitUI);
+  if (window.ResizeObserver) new ResizeObserver(fitUI).observe(document.body);
+  document.querySelectorAll('details.panel').forEach(d => d.addEventListener('toggle', () => {
+    // Aynı anda tek panel açık kalsın; ekran alanı metne kalsın.
+    if (d.open) document.querySelectorAll('details.panel[open]').forEach(o => { if (o !== d) o.open = false; });
+    fitUI();
+  }));
 
   // ---------- Olaylar ----------
   // Fareyle basılan düğmeler odağı ve metin seçimini çalmasın (Seçili metni oku bu sayede çalışır).
-  document.addEventListener('mousedown', e => { if (e.target.closest && e.target.closest('button')) e.preventDefault(); });
+  document.addEventListener('mousedown', e => {
+    const b = e.target.closest && e.target.closest('button');
+    if (b && !b.closest('.modal')) e.preventDefault();
+  });
 
   editor.addEventListener('input', () => {
     if (isActive()) stopAll(false);
@@ -1137,6 +2384,7 @@ function wordRangeAt(S, off) {
       setStatus(ok ? 'Otomatik kaydedildi.' : 'Tarayıcı kaydı kullanılamıyor (metin çok büyük olabilir).', ok ? 2000 : 6000);
     }, 300);
   });
+  editor.addEventListener('paste', () => { if (!editor.value.trim()) setDocName(''); });
   const syncCaret = () => {
     if (isActive() || isReading()) return;
     const i = indexAtOffset(editor.selectionStart);
@@ -1145,7 +2393,7 @@ function wordRangeAt(S, off) {
   editor.addEventListener('click', syncCaret);
   editor.addEventListener('keyup', syncCaret);
 
-  // ---------- Sayfa içi onay penceresi ----------
+  // ---------- Pencereler ----------
   const modal = $('confirmModal');
   let modalResolve = null;
   function askConfirm(message, yesLabel = 'Evet') {
@@ -1165,6 +2413,32 @@ function wordRangeAt(S, off) {
   $('confirmNo').addEventListener('click', () => closeConfirm(false));
   modal.addEventListener('click', e => { if (e.target === modal) closeConfirm(false); });
 
+  const helpModal = $('helpModal'), aboutModal = $('aboutModal');
+  const helpNav = $('helpNav'), helpSections = [...document.querySelectorAll('#helpContent section')];
+  helpSections.forEach((sec, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = sec.dataset.title;
+    b.addEventListener('click', () => showHelp(i));
+    helpNav.appendChild(b);
+  });
+  function showHelp(i) {
+    helpSections.forEach((s, k) => s.classList.toggle('sel', k === i));
+    [...helpNav.children].forEach((b, k) => b.classList.toggle('sel', k === i));
+    $('helpContent').scrollTop = 0;
+  }
+  function openDialog(m) {
+    [helpModal, aboutModal].forEach(x => { x.hidden = x !== m; });
+    if (m === helpModal && !helpSections.some(s => s.classList.contains('sel'))) showHelp(0);
+    const c = m.querySelector('[data-close]');
+    if (c) c.focus({ preventScroll: true });
+  }
+  function closeDialogs() { helpModal.hidden = true; aboutModal.hidden = true; }
+  const dialogOpen = () => !helpModal.hidden || !aboutModal.hidden;
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeDialogs));
+  [helpModal, aboutModal].forEach(m => m.addEventListener('click', e => { if (e.target === m) closeDialogs(); }));
+  $('helpBtn').addEventListener('click', () => openDialog(helpModal));
+  $('aboutBtn').addEventListener('click', () => openDialog(aboutModal));
+
   // ---------- Düzen (masaüstü / mobil, simgeli düğmeler) ----------
   const layoutSelect = $('layoutSelect'), optIcons = $('optIcons');
   function applyLayout() {
@@ -1172,7 +2446,8 @@ function wordRangeAt(S, off) {
     document.body.classList.toggle('icons-only', !!settings.iconsOnly);
     layoutSelect.value = settings.layout === 'mobile' ? 'mobile' : 'desktop';
     optIcons.checked = !!settings.iconsOnly;
-    if (isActive() === false) statusEl.textContent = defaultStatus();
+    if (!isActive()) statusEl.textContent = defaultStatus();
+    fitUI();
   }
   layoutSelect.addEventListener('change', () => {
     settings.layout = layoutSelect.value; saveSettings(); applyLayout();
@@ -1200,7 +2475,7 @@ function wordRangeAt(S, off) {
   readerView.addEventListener('touchend', e => {
     const wasTap = touchStart && !touchStart.moved;
     touchStart = null;
-    if (!wasTap) { lastTap.t = 0; return; }                 // kaydırma hareketi dokunma sayılmaz
+    if (!wasTap) { lastTap.t = 0; return; }
     const sp = e.target.closest && e.target.closest('.sentence');
     if (!sp) { lastTap.t = 0; return; }
     const now = Date.now(), i = Number(sp.dataset.index);
@@ -1214,7 +2489,7 @@ function wordRangeAt(S, off) {
     }
   }, { passive: false });
   readerView.addEventListener('dblclick', e => {
-    if (Date.now() - touchHandledAt < 800) return;          // dokunma zaten başlattı
+    if (Date.now() - touchHandledAt < 800) return;
     const sp = e.target.closest && e.target.closest('.sentence');
     if (sp) readFromSpan(sp);
   });
@@ -1230,70 +2505,82 @@ function wordRangeAt(S, off) {
   toggleBtn.addEventListener('click', togglePlay);
   markBtn.addEventListener('click', toggleMark);
   $('stopBtn').addEventListener('click', () => stopAll(true));
-  viewBtn.addEventListener('click', () => {
+  function toggleView() {
     if (isReading()) stopAll(true);
     else { enterReading(); setCurrent(currentIndex, true); }
-  });
+  }
+  viewBtn.addEventListener('click', toggleView);
+  copyBtn.addEventListener('click', copyCurrent);
+  $('clearBtn').addEventListener('click', clearText);
 
-  $('copySentenceBtn').addEventListener('click', async () => {
-    const s = sentences[currentIndex];
-    if (!s) return;
-    const b = $('copySentenceBtn');
-    b.textContent = (await copyText(s.text)) ? 'Kopyalandı ✓' : 'Kopyalanamadı';
-    setTimeout(() => { b.textContent = 'Kopyala'; }, 1400);
-  });
-
-  $('clearBtn').addEventListener('click', async () => {
-    if (editor.value && !(await askConfirm('Editördeki metnin tamamı silinsin mi? Bu işlem geri alınamaz.', 'Metni sil'))) return;
-    stopAll(true);
-    editor.value = '';
-    currentIndex = 0; finished = false;
-    rebuild();
-    LS.set('darkReaderText', '');
-    LS.set('darkReaderIndex', '0');
-    renderMarks();
-    editor.focus();
-  });
-
+  // ---------- Klavye kısayolları ----------
+  const TEXT_INPUT_TYPES = new Set(['text', 'number', 'search', 'email', 'url', 'password', 'tel']);
+  function typingTarget(el) {
+    if (!el) return false;
+    const tag = (el.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable) return true;
+    return tag === 'INPUT' && TEXT_INPUT_TYPES.has((el.type || 'text').toLowerCase());
+  }
   document.addEventListener('keydown', e => {
-    if (!modal.hidden) {                                     // onay penceresi açıkken kısayollar devre dışı
+    if (!modal.hidden) {
       if (e.key === 'Escape') { e.preventDefault(); closeConfirm(false); }
       return;
     }
+    if (dialogOpen()) {
+      if (e.key === 'Escape' || e.key === 'F1') { e.preventDefault(); closeDialogs(); }
+      return;
+    }
+    if (e.key === 'F1') { e.preventDefault(); openDialog(helpModal); return; }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'o' || e.key === 'O')) {
+      e.preventDefault(); fileInput.click(); return;
+    }
     if (e.key === 'Escape') {
-      if (isReading() || isActive()) { e.preventDefault(); stopAll(true); }
+      e.preventDefault();
+      if (isActive() || isReading()) stopAll(true);   // okuma → düzenleme
+      else toggleView();                               // düzenleme → okuma görünümü (kısayollar çalışır)
       return;
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const tag = (e.target && e.target.tagName ? e.target.tagName : '').toUpperCase();
-    if (['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON', 'SUMMARY'].includes(tag) || (e.target && e.target.isContentEditable)) return;
-    if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); goNext(); }
-    else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleMark(); }
-    else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); restartSentence(); }
+    const el = e.target;
+    if (typingTarget(el)) return;
+    const tag = (el && el.tagName ? el.tagName : '').toUpperCase();
+    if (e.code === 'Space' || e.key === ' ') {
+      if (tag === 'BUTTON' || tag === 'SUMMARY' || (tag === 'INPUT' && /checkbox|radio|range|color/.test(el.type))) return;
+      e.preventDefault(); togglePlay(); return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      if (tag === 'INPUT') return;                       // kaydırıcılar oklarla değişsin
+      e.preventDefault(); e.key === 'ArrowLeft' ? goPrev() : goNext(); return;
+    }
+    if (e.repeat) return;
+    const k = (e.key || '').toLocaleLowerCase('tr');
+    const actions = {
+      m: toggleMark, r: restartSentence, c: copyCurrent, v: pasteFromClipboard,
+      a: () => readAllFrom(0), e: clearText
+    };
+    if (actions[k]) { e.preventDefault(); actions[k](); }
   });
 
   // Kaydırıcı ve kutular işini bitirince odağı bıraksın; kısayollar hemen çalışsın.
   document.querySelectorAll('input[type=range], input[type=checkbox], input[type=color], select').forEach(el => {
-    el.addEventListener('change', () => { if (el !== dictText) el.blur(); });
+    el.addEventListener('change', () => el.blur());
   });
 
   voiceSelect.addEventListener('change', () => {
-    lastVoiceValue = voiceSelect.value;
     settings.voice = voiceSelect.value;
     saveSettings();
+    updateVoiceInfo();
     liveRestart();
   });
   rate.addEventListener('input', () => {
     settings.rate = rate.value; saveSettings();
-    $('rateValue').textContent = `${fmt(rate.value)}×`;
-    if (engine.audio) engine.audio.playbackRate = Number(rate.value); else liveRestart();
+    $('rateValue').textContent = `${fmt(rate.value, 2).replace(/0$/, '')}×`;
+    liveRestart();
     updateInfo();
   });
   pitch.addEventListener('input', () => {
     settings.pitch = pitch.value; saveSettings();
-    $('pitchValue').textContent = fmt(pitch.value);
+    $('pitchValue').textContent = fmt(pitch.value, 2).replace(/0$/, '');
     liveRestart();
   });
   sentPause.addEventListener('input', () => {
@@ -1306,6 +2593,7 @@ function wordRangeAt(S, off) {
   });
   optRoman.addEventListener('change', () => { settings.roman = optRoman.checked; saveSettings(); liveRestart(); });
   optAbbr.addEventListener('change', () => { settings.abbr = optAbbr.checked; saveSettings(); liveRestart(); });
+  optFootnotes.addEventListener('change', () => { settings.footnotes = optFootnotes.checked; saveSettings(); });
   const refreshLong = () => {
     saveSettings();
     readerDirty = true;
@@ -1317,19 +2605,20 @@ function wordRangeAt(S, off) {
     longMax.value = String(v); settings.longMax = String(v); refreshLong();
   });
 
-  themeSelect.addEventListener('change', () => {
-    settings.theme = themeSelect.value;
-    if (settings.theme !== 'custom') { settings.bg = ''; settings.text = ''; }
-    else { settings.bg = bgColor.value; settings.text = textColor.value; }
+  const bindLook = (el, key, ev = 'input') => el.addEventListener(ev, () => { settings[key] = el.value; saveSettings(); applyAppearance(); });
+  bindLook(fontFamily, 'font', 'change');
+  bindLook(fontWeight, 'weight', 'change');
+  bindLook(textAlign, 'align', 'change');
+  bindLook(measure, 'measure', 'change');
+  bindLook(fontSize, 'size');
+  bindLook(lineHeight, 'lh');
+  bindLook(letterSpacing, 'ls');
+  bindLook(wordSpacing, 'ws');
+  $('resetAppearanceBtn').addEventListener('click', () => {
+    const keepCustom = settings.custom;
+    Object.assign(settings, DEFAULT_LOOK, { custom: keepCustom });
     saveSettings(); applyAppearance();
   });
-  const onColor = () => { settings.theme = 'custom'; settings.bg = bgColor.value; settings.text = textColor.value; saveSettings(); applyAppearance(); };
-  bgColor.addEventListener('input', onColor);
-  textColor.addEventListener('input', onColor);
-  fontFamily.addEventListener('change', () => { settings.font = fontFamily.value; saveSettings(); applyAppearance(); });
-  fontSize.addEventListener('input', () => { settings.size = fontSize.value; saveSettings(); applyAppearance(); });
-  lineHeight.addEventListener('input', () => { settings.lh = lineHeight.value; saveSettings(); applyAppearance(); });
-  $('resetAppearanceBtn').addEventListener('click', () => { Object.assign(settings, DEFAULT_LOOK); saveSettings(); applyAppearance(); });
 
   function applyDict(src) {
     dictRules = parseDict(src);
@@ -1363,13 +2652,14 @@ function wordRangeAt(S, off) {
   });
 
   // ---------- Başlangıç ----------
+  buildFontList();
   applyLayout();
   rate.value = settings.rate; pitch.value = settings.pitch;
   sentPause.value = settings.sentPause; paraPause.value = settings.paraPause;
   optRoman.checked = !!settings.roman; optAbbr.checked = !!settings.abbr;
-  optLong.checked = !!settings.longOn; longMax.value = settings.longMax;
-  $('rateValue').textContent = `${fmt(rate.value)}×`;
-  $('pitchValue').textContent = fmt(pitch.value);
+  optLong.checked = !!settings.longOn; longMax.value = settings.longMax; optFootnotes.checked = !!settings.footnotes;
+  $('rateValue').textContent = `${fmt(rate.value, 2).replace(/0$/, '')}×`;
+  $('pitchValue').textContent = fmt(pitch.value, 2).replace(/0$/, '');
   $('sentPauseValue').textContent = `${sentPause.value} ms`;
   $('paraPauseValue').textContent = `${paraPause.value} ms`;
   applyAppearance();
@@ -1382,6 +2672,7 @@ function wordRangeAt(S, off) {
   editor.value = LS.get('darkReaderText', '');
   const savedIdx = parseInt(LS.get('darkReaderIndex', '0'), 10);
   currentIndex = Number.isFinite(savedIdx) && savedIdx >= 0 ? savedIdx : 0;
+  setDocName(editor.value ? LS.get('mo4DocName', '') : '');
   rebuild();
   renderMarks();
 
@@ -1391,11 +2682,11 @@ function wordRangeAt(S, off) {
     setTimeout(loadVoices, 800);
   }
   setStatus(segmenter ? defaultStatus() : 'Bu tarayıcıda gelişmiş cümle bölme yok; basit bölme kullanılıyor.', segmenter ? 0 : 6000);
-  if (window.innerWidth < 700 && settings.layout !== 'mobile' && !LS.get('mo3MobileHint', '')) {
-    LS.set('mo3MobileHint', '1');
-    setStatus('Dar ekrandasın: “🎨 Görünüm” panelinden Mobil düzeni deneyebilirsin.', 9000);
-  }
   updateControls();
+  fitUI();
+
+  // Sınama için dışarıya açılan küçük bir arayüz (konsoldan kullanılabilir).
+  window.MetinOkuyucu = { loadFiles, replaceText, undoReplace, fitUI, version: '4.0' };
 })();
 </script>
 </body>
